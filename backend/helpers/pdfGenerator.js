@@ -15,11 +15,72 @@ async function generarActaPDF(data = {}) {
     body {
         font-family: 'Calibri', sans-serif;
     }
+    
+    /* --- ESTILOS DEL MEMBRETE OFICIAL --- */
+    .header-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1.5px solid black;
+        table-layout: fixed;
+        margin-bottom: 15px;
+    }
+    .header-table td {
+        border: 1px solid black;
+        padding: 6px;
+        vertical-align: middle;
+        text-align: center;
+    }
+    .logo-cell {
+        width: 35%;
+        text-align: left;
+        font-size: 7.5pt;
+        font-weight: bold;
+    }
+    .brand-name {
+        font-size: 15pt;
+        font-weight: bold;
+        letter-spacing: -0.5px;
+    }
+    .brand-plus {
+        color: #00cc66; /* Verde corporativo */
+    }
+    .meta-cell {
+        font-size: 8.5pt;
+    }
+    .title-cell {
+        font-size: 10.5pt;
+        font-weight: bold;
+        padding: 8px;
+        text-align: center;
+    }
 </style>
 </head>
 <body lang="ES-CO" style="tab-interval:.5in;word-wrap:break-word">
 
 <div class="WordSection1">
+
+<!-- ========================================== -->
+<!-- TABLA DE ENCABEZADO / MEMBRETE             -->
+<!-- ========================================== -->
+<table class="header-table">
+    <tr>
+        <!-- Logo y Razón Social -->
+        <td rowspan="2" class="logo-cell">
+            POSITIVO S+ IT SOLUTIONS S.A.S.<br>
+            <span class="brand-name">POSITIVO S<span class="brand-plus">+</span></span>
+        </td>
+        <!-- Código, Versión, Fecha -->
+        <td class="meta-cell">A-ACT-00429</td>
+        <td class="meta-cell">Versión: 2.0</td>
+        <td class="meta-cell">Fecha: 10/01/2025</td>
+    </tr>
+    <tr>
+        <!-- Título del Acta -->
+        <td colspan="3" class="title-cell">
+            ACTA HERRAMIENTAS DE TRABAJO PARA ASOCIADOS
+        </td>
+    </tr>
+</table>
 
 <p class="MsoBodyText" style="margin-top:13.05pt;margin-right:0in;margin-bottom:
 0in;margin-left:19.7pt;margin-bottom:.0001pt;text-align:justify"><span lang="ES">Positivos<span style="letter-spacing:-.35pt"> </span><span style="letter-spacing:-.5pt">+</span></span></p>
@@ -498,5 +559,5 @@ estipulado en la legislación COLOMBIANA con el equivalente a un (01) S.M.L.M.V.
     };
 }
 
-// ⚠️ ESTO ES LO QUE FALTABA: Exportar la función correctamente para Node.js
+// Exportar la función correctamente para Node.js
 module.exports = generarActaPDF;
