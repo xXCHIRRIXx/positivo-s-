@@ -6,8 +6,9 @@ export default function Chat() {
 
   // Datos del usuario con la sesión activa
   const miEmail = localStorage.getItem('usuarioEmail') || 'usuario@positivo.com';
-  const miNombre = localStorage.getItem('usuarioNombre') || 'Usuario';
-  const miCargo = localStorage.getItem('usuarioCargo') || 'Asociado';
+  const [miNombre, setMiNombre] = useState(localStorage.getItem('usuarioNombre') || 'Usuario');
+  const [miCargo, setMiCargo] = useState(localStorage.getItem('usuarioCargo') || 'Asociado');
+  const [miFoto, setMiFoto] = useState(localStorage.getItem('usuarioFoto') || '');
 
   // Estado del chat activo (Por defecto: Canal General)
   const [chatActivo, setChatActivo] = useState({
@@ -36,16 +37,37 @@ export default function Chat() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 1. Cargar la lista completa de asociados desde el Backend
+  // 1. Cargar la lista completa de asociados desde el Backend y sincronizar tu perfil exacto
   const obtenerUsuarios = async () => {
     try {
       const response = await fetch('http://localhost:4000/api/usuarios');
       if (response.ok) {
         const data = await response.json();
+
+        // Buscar tu propio usuario dentro del listado general (asegurando el cargo real)
+        const miUsuarioEnBD = data.find(u => {
+          const emailU = u.email || u.correo;
+          return emailU && miEmail && emailU.toLowerCase() === miEmail.toLowerCase();
+        });
+
+        if (miUsuarioEnBD) {
+          const nombreFinal = miUsuarioEnBD.nombre || localStorage.getItem('usuarioNombre') || 'Usuario';
+          const cargoFinal = miUsuarioEnBD.cargo || miUsuarioEnBD.puesto || miUsuarioEnBD.rol || localStorage.getItem('usuarioCargo') || 'Asociado';
+          const fotoFinal = miUsuarioEnBD.foto || localStorage.getItem('usuarioFoto') || '';
+
+          setMiNombre(nombreFinal);
+          setMiCargo(cargoFinal);
+          setMiFoto(fotoFinal);
+
+          localStorage.setItem('usuarioNombre', nombreFinal);
+          localStorage.setItem('usuarioCargo', cargoFinal);
+          localStorage.setItem('usuarioFoto', fotoFinal);
+        }
+
         // Filtrar para no mostrarme a mí mismo en la lista de contactos a escribir
         const otrosUsuarios = data.filter(u => {
           const emailU = u.email || u.correo;
-          return emailU && emailU.toLowerCase() !== miEmail.toLowerCase();
+          return emailU && miEmail && emailU.toLowerCase() !== miEmail.toLowerCase();
         });
         setUsuarios(otrosUsuarios);
       }
@@ -85,7 +107,7 @@ export default function Chat() {
   const abrirChatPrivado = (asociado) => {
     const emailDestino = asociado.email || asociado.correo;
     const nombreDestino = asociado.nombre || emailDestino;
-    const cargoDestino = asociado.cargo || 'Asociado';
+    const cargoDestino = asociado.cargo || asociado.puesto || asociado.rol || 'Asociado';
 
     // Generar un ID único e idéntico para ambos usuarios (ordenando alfabéticamente sus correos)
     const correosOrdenados = [miEmail.toLowerCase(), emailDestino.toLowerCase()].sort();
@@ -158,7 +180,7 @@ export default function Chat() {
   const usuariosFiltrados = usuarios.filter(u => {
     const term = busqueda.toLowerCase();
     const n = (u.nombre || '').toLowerCase();
-    const c = (u.cargo || '').toLowerCase();
+    const c = (u.cargo || u.puesto || u.rol || '').toLowerCase();
     const e = (u.email || u.correo || '').toLowerCase();
     return n.includes(term) || c.includes(term) || e.includes(term);
   });
@@ -206,7 +228,7 @@ export default function Chat() {
           </div>
         </button>
 
-        {/* DIRECTORY DE ASOCIADOS */}
+        {/* DIRECTORIO DE ASOCIADOS */}
         <div style={{ ...styles.sectionTitle, marginTop: '20px' }}>CONTACTO DIRECTO (1 A 1)</div>
         
         <input
@@ -226,7 +248,7 @@ export default function Chat() {
             usuariosFiltrados.map((u, i) => {
               const uEmail = u.email || u.correo;
               const uNombre = u.nombre || uEmail;
-              const uCargo = u.cargo || 'Asociado';
+              const uCargo = u.cargo || u.puesto || u.rol || 'Asociado';
               const estaSeleccionado = chatActivo.email === uEmail;
 
               return (
@@ -239,7 +261,11 @@ export default function Chat() {
                   }}
                 >
                   <div style={styles.userAvatar}>
-                    {uNombre.charAt(0).toUpperCase()}
+                    {u.foto ? (
+                      <img src={u.foto} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                    ) : (
+                      uNombre.charAt(0).toUpperCase()
+                    )}
                   </div>
                   <div style={styles.userInfoText}>
                     <span style={styles.userNameText}>{uNombre}</span>
@@ -285,7 +311,11 @@ export default function Chat() {
           {/* INFORMACIÓN DEL USUARIO LOGUEADO */}
           <div style={styles.myProfileBadge}>
             <div style={styles.myAvatar}>
-              {miNombre.charAt(0).toUpperCase()}
+              {miFoto ? (
+                <img src={miFoto} alt="Mi Perfil" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+              ) : (
+                miNombre.charAt(0).toUpperCase()
+              )}
             </div>
             {!isMobile && (
               <div style={{ textAlign: 'right' }}>
@@ -311,12 +341,11 @@ export default function Chat() {
             </div>
           ) : (
             mensajes.map((msg, idx) => {
-              // Determinar si el mensaje lo envié yo o lo envió otro asociado
               const remitenteCorreo = msg.remitenteEmail || msg.remitente;
               const esMio = remitenteCorreo && remitenteCorreo.toLowerCase() === miEmail.toLowerCase();
               
               const nombreMostrar = msg.remitenteNombre || msg.remitente || 'Asociado';
-              const cargoMostrar = msg.remitenteCargo || 'Asociado';
+              const cargoMostrar = msg.remitenteCargo || msg.cargo || 'Asociado';
               const tiempoMostrar = formatearFechaHora(msg.fechaHora || msg.fecha);
 
               return (
@@ -339,7 +368,6 @@ export default function Chat() {
                       ...(esMio ? styles.messageBubbleMine : styles.messageBubbleOther)
                     }}
                   >
-                    {/* CABECERA DEL MENSAJE: NOMBRE, CARGO Y FECHA/HORA DE CADA INTEGRANTE */}
                     <div style={styles.msgHeaderLine}>
                       <span style={esMio ? styles.msgNameMine : styles.msgNameOther}>
                         {nombreMostrar}
@@ -348,10 +376,8 @@ export default function Chat() {
                       <span style={styles.msgTimeTag}>{tiempoMostrar}</span>
                     </div>
 
-                    {/* TEXTO DEL MENSAJE */}
                     {msg.texto && <div style={styles.msgBodyText}>{msg.texto}</div>}
 
-                    {/* ARCHIVO ADJUNTO */}
                     {msg.archivo && (
                       <div style={{ marginTop: '8px' }}>
                         {msg.archivo.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
@@ -589,7 +615,8 @@ const styles = {
     justifyContent: 'center',
     fontSize: '0.85rem',
     fontWeight: 'bold',
-    flexShrink: 0
+    flexShrink: 0,
+    overflow: 'hidden'
   },
   userInfoText: {
     display: 'flex',
@@ -686,7 +713,8 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     fontWeight: 'bold',
-    fontSize: '0.9rem'
+    fontSize: '0.9rem',
+    overflow: 'hidden'
   },
   myProfileName: {
     color: '#f8fafc',
@@ -784,7 +812,7 @@ const styles = {
   },
   msgBodyText: {
     fontSize: '0.88rem',
-    lineHeight: '1.4',
+    lineH: '1.4',
     wordBreak: 'break-word'
   },
   imageAttachment: {

@@ -13,11 +13,11 @@ const PORT = process.env.PORT || 4000;
 // MIDDLEWARES GLOBALES
 // ==========================================
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // ==========================================
-// CONFIGURACIÓN DE CARPETA Y MULTER (ARCHIVOS/FOTOS)
+// CONFIGURACIÓN DE CARPETA Y MULTER (FOTOS)
 // ==========================================
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
@@ -36,16 +36,28 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
     storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 } // Límite de 10MB
+    limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// Hacer pública la carpeta 'uploads' para descargas y vista previa
+// Middleware flexible para Multer: evita que falle si el usuario envía texto en vez de un archivo
+const uploadFlexible = (fieldName) => {
+    return (req, res, next) => {
+        upload.single(fieldName)(req, res, (err) => {
+            if (err instanceof multer.MulterError) {
+                return res.status(400).json({ error: `Error en la subida del archivo: ${err.message}` });
+            } else if (err) {
+                return res.status(500).json({ error: `Error interno de archivo: ${err.message}` });
+            }
+            next();
+        });
+    };
+};
+
 app.use('/uploads', express.static(uploadDir));
 
 // ==========================================
 // RUTAS DE PRUEBA Y AUTENTICACIÓN
 // ==========================================
-
 app.get('/', (req, res) => {
     res.json({ mensaje: '¡API de Inventario Positivo funcionando correctamente!' });
 });
@@ -65,7 +77,6 @@ app.get('/api/inventario', verifyToken, async (req, res) => {
 // ==========================================
 // RUTAS DE GESTIÓN DE USUARIOS
 // ==========================================
-
 app.get('/api/usuarios', async (req, res) => {
     try {
         const snapshot = await db.collection('usuarios').get();
@@ -75,7 +86,8 @@ app.get('/api/usuarios', async (req, res) => {
                 id: doc.id,
                 nombre: data.nombre || 'Usuario',
                 email: data.email || data.correo || '',
-                cargo: data.cargo || 'Asociado'
+                cargo: data.cargo || 'Asociado',
+                foto: data.foto || ''
             };
         });
         res.status(200).json(usuarios);
@@ -84,27 +96,79 @@ app.get('/api/usuarios', async (req, res) => {
     }
 });
 
+// Handler robusto para actualizar perfiles vía FormData o JSON usando POST
+const actualizarUsuarioHandler = async (req, res) => {
+    try {
+        const identificador = req.body.email || req.params.email || req.params.id;
+        
+        if (!identificador) {
+            return res.status(400).json({ error: 'Falta el correo o identificador del usuario.' });
+        }
+
+        const { nombre, cargo } = req.body;
+        let fotoFinal = req.body.foto;
+
+        // Si se subió un archivo físico mediante Multer
+        if (req.file) {
+            fotoFinal = `http://localhost:${PORT}/uploads/${req.file.filename}`;
+        }
+
+        const usuariosRef = db.collection('usuarios');
+        let snapshot = await usuariosRef.where('email', '==', identificador).get();
+        
+        if (snapshot.empty) {
+            snapshot = await usuariosRef.where('correo', '==', identificador).get();
+        }
+
+        if (snapshot.empty) {
+            const nuevoDocRef = usuariosRef.doc();
+            await nuevoDocRef.set({
+                email: identificador,
+                nombre: nombre || 'Usuario',
+                cargo: cargo || 'Asociado',
+                foto: fotoFinal || ''
+            });
+
+            return res.status(200).json({ 
+                message: 'Perfil creado y guardado correctamente',
+                foto: fotoFinal || ''
+            });
+        }
+
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => {
+            const updateData = {};
+            if (nombre !== undefined) updateData.nombre = nombre;
+            if (cargo !== undefined) updateData.cargo = cargo;
+            if (fotoFinal !== undefined) updateData.foto = fotoFinal;
+            batch.update(doc.ref, updateData);
+        });
+        await batch.commit();
+
+        res.status(200).json({ 
+            message: 'Perfil actualizado correctamente en la base de datos',
+            foto: fotoFinal || ''
+        });
+    } catch (error) {
+        console.error("Error en servidor al actualizar perfil:", error);
+        res.status(500).json({ error: 'Error actualizando perfil: ' + error.message });
+    }
+};
+
+// Rutas configuradas con POST usando el middleware flexible
+app.post('/api/usuarios/actualizar', uploadFlexible('foto'), actualizarUsuarioHandler);
+app.post('/api/usuarios/:email', uploadFlexible('foto'), actualizarUsuarioHandler);
+app.post('/api/perfil', uploadFlexible('foto'), actualizarUsuarioHandler);
+
 // ==========================================
 // RUTAS DE GESTIÓN DE EQUIPOS
 // ==========================================
-
-// 1. Registrar equipo
 app.post('/api/equipos', async (req, res) => {
     try {
         const { 
-            serial, 
-            tipoPropiedad, 
-            proveedor, 
-            modelo, 
-            descripcion, 
-            estadoFisico, 
-            disponibilidad, 
-            ciudad, 
-            usuarioRegistro,
-            asignadoA,
-            asignado_a,
-            identificacionUsuario,
-            identificacion_usuario
+            serial, tipoPropiedad, proveedor, modelo, descripcion, 
+            estadoFisico, disponibilidad, ciudad, usuarioRegistro,
+            asignadoA, asignado_a, identificacionUsuario, identificacion_usuario
         } = req.body;
 
         if (!serial || !modelo) {
@@ -131,21 +195,17 @@ app.post('/api/equipos', async (req, res) => {
             ciudad: ciudad || 'Bogotá',
             asignadoA: finalAsignadoA,
             identificacionUsuario: finalIdentificacion,
-            asignado_a: finalAsignadoA,
-            identificacion_usuario: finalIdentificacion,
             usuarioRegistro: usuarioRegistro || 'Desconocido',
             fechaRegistro: new Date().toISOString()
         };
 
         const docRef = await db.collection('equipos').add(nuevoEquipo);
         res.status(201).json({ message: 'Equipo registrado con éxito', id: docRef.id, ...nuevoEquipo });
-
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 2. Obtener / Listar todos los equipos
 app.get('/api/equipos', async (req, res) => {
     try {
         const snapshot = await db.collection('equipos').get();
@@ -156,40 +216,26 @@ app.get('/api/equipos', async (req, res) => {
     }
 });
 
-// 2.1 Obtener un equipo específico por ID
 app.get('/api/equipos/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const equipoRef = db.collection('equipos').doc(id);
-        const docSnap = await equipoRef.get();
-
+        const docSnap = await db.collection('equipos').doc(id).get();
         if (!docSnap.exists) {
             return res.status(404).json({ error: 'El equipo no existe en la base de datos.' });
         }
-
         res.status(200).json({ id: docSnap.id, ...docSnap.data() });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 3. Actualizar equipo por ID
 app.put('/api/equipos/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const { 
-            serial, 
-            tipoPropiedad, 
-            proveedor, 
-            modelo, 
-            descripcion, 
-            estadoFisico, 
-            disponibilidad, 
-            ciudad,
-            asignadoA,
-            asignado_a,
-            identificacionUsuario,
-            identificacion_usuario
+            serial, tipoPropiedad, proveedor, modelo, descripcion, 
+            estadoFisico, disponibilidad, ciudad, asignadoA, asignado_a, 
+            identificacionUsuario, identificacion_usuario 
         } = req.body;
 
         const equipoRef = db.collection('equipos').doc(id);
@@ -197,13 +243,6 @@ app.put('/api/equipos/:id', async (req, res) => {
 
         if (!docSnap.exists) {
             return res.status(404).json({ error: 'El equipo no existe en la base de datos.' });
-        }
-
-        if (serial && serial !== docSnap.data().serial) {
-            const serialCheck = await db.collection('equipos').where('serial', '==', serial).get();
-            if (!serialCheck.empty) {
-                return res.status(400).json({ error: 'El nuevo número de serie ya pertenece a otro equipo.' });
-            }
         }
 
         const nuevaDisponibilidad = disponibilidad || docSnap.data().disponibilidad;
@@ -215,7 +254,7 @@ app.put('/api/equipos/:id', async (req, res) => {
         const datosActualizados = {
             serial: serial || docSnap.data().serial,
             tipoPropiedad: tipoPropiedad || docSnap.data().tipoPropiedad,
-            proveedor: tipoPropiedad === 'Proveedor' ? proveedor : (docSnap.data().proveedor || 'N/A'),
+            proveedor: tipoPropiedad === 'Proveedor' ? proveedor : 'N/A',
             modelo: modelo || docSnap.data().modelo,
             descripcion: descripcion !== undefined ? descripcion : docSnap.data().descripcion,
             estadoFisico: estadoFisico || docSnap.data().estadoFisico,
@@ -223,34 +262,24 @@ app.put('/api/equipos/:id', async (req, res) => {
             ciudad: ciudad || docSnap.data().ciudad,
             asignadoA: finalAsignadoA,
             identificacionUsuario: finalIdentificacion,
-            asignado_a: finalAsignadoA,
-            identificacion_usuario: finalIdentificacion,
             fechaActualizacion: new Date().toISOString()
         };
 
         await equipoRef.update(datosActualizados);
-
-        res.status(200).json({ 
-            message: 'Equipo actualizado correctamente', 
-            id, 
-            ...datosActualizados 
-        });
+        res.status(200).json({ message: 'Equipo actualizado correctamente', id, ...datosActualizados });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 4. Eliminar equipo por ID
 app.delete('/api/equipos/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const equipoRef = db.collection('equipos').doc(id);
         const docSnap = await equipoRef.get();
-
         if (!docSnap.exists) {
             return res.status(404).json({ error: 'El equipo no existe.' });
         }
-
         await equipoRef.delete();
         res.status(200).json({ message: 'Equipo eliminado correctamente' });
     } catch (error) {
@@ -261,32 +290,19 @@ app.delete('/api/equipos/:id', async (req, res) => {
 // ==========================================
 // RUTAS DE GESTIÓN DE ACTAS
 // ==========================================
-
 app.post('/api/actas', async (req, res) => {
     try {
         const { 
-            tipoActa,           
-            nombresColaborador, 
-            identificacion, 
-            correoCorporativo, 
-            cargo, 
-            centroResultados, 
-            liderInmediato, 
-            fechaAsignacion,    
-            equipos,            
-            nombreResponsable,  
-            identificacionResponsable,
-            usuarioRegistro,
-            auditoria_responsable
+            tipoActa, nombresColaborador, identificacion, correoCorporativo, 
+            cargo, centroResultados, liderInmediato, fechaAsignacion, 
+            equipos, nombreResponsable, identificacionResponsable, usuarioRegistro 
         } = req.body;
 
         if (!equipos || !Array.isArray(equipos) || equipos.length === 0) {
             return res.status(400).json({ error: 'Debe incluir al menos un equipo en el acta.' });
         }
 
-        // Definición unificada robusta para cubrir cualquier propiedad que mande el frontend
-        const responsableFinal = nombreResponsable || usuarioRegistro || auditoria_responsable || 'Soporte Técnico Positivo';
-        const finalIdentificacionResponsable = identificacionResponsable || 'N/A';
+        const responsableFinal = nombreResponsable || usuarioRegistro || 'Soporte Técnico Positivo';
 
         const nuevaActa = {
             tipoActa: tipoActa || 'Asignación',
@@ -299,15 +315,12 @@ app.post('/api/actas', async (req, res) => {
             fechaAsignacion,
             equipos,
             nombreResponsable: responsableFinal,
-            usuarioRegistro: responsableFinal, // <-- Garantiza que se guarde el campo en Firestore para el Dashboard
-            identificacionResponsable: finalIdentificacionResponsable,
+            identificacionResponsable: identificacionResponsable || 'N/A',
             fechaCreacion: new Date().toISOString()
         };
 
         const docRef = await db.collection('actas').add(nuevaActa);
-
-        res.status(201).json({ message: `Acta de ${tipoActa} generada con éxito`, id: docRef.id, ...nuevaActa });
-
+        res.status(201).json({ message: 'Acta generada con éxito', id: docRef.id, ...nuevaActa });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -326,13 +339,10 @@ app.get('/api/actas', async (req, res) => {
 app.get('/api/actas/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const actaRef = db.collection('actas').doc(id);
-        const docSnap = await actaRef.get();
-
+        const docSnap = await db.collection('actas').doc(id).get();
         if (!docSnap.exists) {
             return res.status(404).json({ error: 'El acta no existe en la base de datos.' });
         }
-
         res.status(200).json({ id: docSnap.id, ...docSnap.data() });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -340,9 +350,8 @@ app.get('/api/actas/:id', async (req, res) => {
 });
 
 // ==========================================
-// RUTAS DE CHAT (PERSISTENCIA FIRESTORE)
+// RUTAS DE CHAT
 // ==========================================
-
 const parseFecha = (fecha) => {
     if (!fecha) return 0;
     if (typeof fecha.toDate === 'function') return fecha.toDate().getTime();
@@ -352,52 +361,55 @@ const parseFecha = (fecha) => {
 app.get('/api/chat/:chatId/mensajes', async (req, res) => {
     try {
         const { chatId } = req.params;
-
-        const snapshot = await db.collection('mensajes')
-            .where('chatId', '==', chatId)
-            .get();
-
+        const snapshot = await db.collection('mensajes').where('chatId', '==', chatId).get();
         const mensajes = snapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() }))
             .sort((a, b) => parseFecha(a.fechaHora) - parseFecha(b.fechaHora));
-
         res.status(200).json(mensajes);
     } catch (error) {
         res.status(500).json({ error: 'Error obteniendo mensajes: ' + error.message });
     }
 });
 
-app.post('/api/chat/enviar', upload.single('archivo'), async (req, res) => {
+app.post('/api/chat/enviar', uploadFlexible('archivo'), async (req, res) => {
     try {
         const { chatId, remitenteEmail, remitenteNombre, remitenteCargo, fechaHora, texto } = req.body;
-        const archivoNombre = req.file ? req.file.filename : null;
-
         const nuevoMensaje = {
             chatId: chatId || 'general',
             remitenteEmail: remitenteEmail || 'usuario@positivo.com',
             remitenteNombre: remitenteNombre || 'Usuario',
             remitenteCargo: remitenteCargo || 'Asociado',
             texto: texto || '',
-            archivo: archivoNombre,
+            archivo: req.file ? `http://localhost:${PORT}/uploads/${req.file.filename}` : null,
             fechaHora: fechaHora || new Date().toISOString()
         };
-
         const docRef = await db.collection('mensajes').add(nuevoMensaje);
-
-        res.status(201).json({ 
-            message: 'Mensaje guardado con éxito', 
-            data: { id: docRef.id, ...nuevoMensaje } 
-        });
+        res.status(201).json({ message: 'Mensaje guardado con éxito', data: { id: docRef.id, ...nuevoMensaje } });
     } catch (error) {
         res.status(500).json({ error: 'Error guardando mensaje: ' + error.message });
     }
 });
 
-// ==========================================
-// RUTAS DE AUTENTICACIÓN
-// ==========================================
+const authRoutesPath = './routes/auth.routes';
+if (fs.existsSync(path.join(__dirname, 'routes', 'auth.routes.js')) || fs.existsSync(path.join(__dirname, 'routes', 'auth.routes'))) {
+    app.use('/api/auth', require(authRoutesPath));
+}
 
-app.use('/api/auth', require('./routes/auth.routes'));
+// ==========================================
+// MIDDLEWARE DE MANEJO DE ERRORES GLOBAL
+// ==========================================
+app.use((err, req, res, next) => {
+    console.error("Error crítico capturado en servidor:", err);
+    if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: 'El archivo adjunto supera el límite máximo permitido de 10MB.' });
+        }
+        return res.status(400).json({ error: `Error en la subida del archivo: ${err.message}` });
+    } else if (err) {
+        return res.status(500).json({ error: `Error interno: ${err.message}` });
+    }
+    next();
+});
 
 app.use((req, res) => {
     res.status(404).json({ error: 'Ruta no encontrada' });
