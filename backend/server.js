@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const verifyToken = require('./auth/auth.middleware');
 const { db } = require('./auth/firebase.config');
+const generarActaPDF = require('./helpers/pdfGenerator');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -41,7 +42,6 @@ const upload = multer({
     limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// Middleware flexible para Multer: evita que falle si el usuario envía texto en vez de un archivo
 const uploadFlexible = (fieldName) => {
     return (req, res, next) => {
         upload.single(fieldName)(req, res, (err) => {
@@ -98,7 +98,6 @@ app.get('/api/usuarios', async (req, res) => {
     }
 });
 
-// Handler robusto para actualizar perfiles vía FormData o JSON usando POST
 const actualizarUsuarioHandler = async (req, res) => {
     try {
         const identificador = req.body.email || req.params.email || req.params.id;
@@ -110,7 +109,6 @@ const actualizarUsuarioHandler = async (req, res) => {
         const { nombre, cargo } = req.body;
         let fotoFinal = req.body.foto;
 
-        // Si se subió un archivo físico mediante Multer
         if (req.file) {
             fotoFinal = `http://localhost:${PORT}/uploads/${req.file.filename}`;
         }
@@ -157,7 +155,6 @@ const actualizarUsuarioHandler = async (req, res) => {
     }
 };
 
-// Rutas configuradas con POST usando el middleware flexible
 app.post('/api/usuarios/actualizar', uploadFlexible('foto'), actualizarUsuarioHandler);
 app.post('/api/usuarios/:email', uploadFlexible('foto'), actualizarUsuarioHandler);
 app.post('/api/perfil', uploadFlexible('foto'), actualizarUsuarioHandler);
@@ -290,40 +287,53 @@ app.delete('/api/equipos/:id', async (req, res) => {
 });
 
 // ==========================================
-// RUTAS DE GESTIÓN DE ACTAS
+// RUTAS DE GESTIÓN DE ACTAS (CON PUPPETEER)
 // ==========================================
 app.post('/api/actas', async (req, res) => {
     try {
-        const { 
-            tipoActa, nombresColaborador, identificacion, correoCorporativo, 
-            cargo, centroResultados, liderInmediato, fechaAsignacion, 
-            equipos, nombreResponsable, identificacionResponsable, usuarioRegistro 
-        } = req.body;
+        const datosActa = req.body;
 
-        if (!equipos || !Array.isArray(equipos) || equipos.length === 0) {
+        if (!datosActa.equipos || !Array.isArray(datosActa.equipos) || datosActa.equipos.length === 0) {
             return res.status(400).json({ error: 'Debe incluir al menos un equipo en el acta.' });
         }
 
-        const responsableFinal = nombreResponsable || usuarioRegistro || 'Soporte Técnico Positivo';
+        const responsableFinal = datosActa.nombreResponsable || datosActa.usuarioRegistro || 'Soporte Técnico Positivo';
 
         const nuevaActa = {
-            tipoActa: tipoActa || 'Asignación',
-            nombresColaborador,
-            identificacion,
-            correoCorporativo,
-            cargo,
-            centroResultados,
-            liderInmediato,
-            fechaAsignacion,
-            equipos,
+            tipoActa: datosActa.tipoActa || 'Asignación',
+            nombresColaborador: datosActa.nombresColaborador,
+            identificacion: datosActa.identificacion,
+            correoCorporativo: datosActa.correoCorporativo,
+            cargo: datosActa.cargo,
+            centroResultados: datosActa.centroResultados,
+            liderInmediato: datosActa.liderInmediato,
+            fechaAsignacion: datosActa.fechaAsignacion,
+            equipos: datosActa.equipos,
             nombreResponsable: responsableFinal,
-            identificacionResponsable: identificacionResponsable || 'N/A',
+            identificacionResponsable: datosActa.identificacionResponsable || 'N/A',
             fechaCreacion: new Date().toISOString()
         };
 
+        // 1. Guardar registro en Firestore
         const docRef = await db.collection('actas').add(nuevaActa);
-        res.status(201).json({ message: 'Acta generada con éxito', id: docRef.id, ...nuevaActa });
+
+        // 2. Ejecutar la generación del PDF con Puppeteer
+        const { nombreArchivo } = await generarActaPDF(datosActa);
+
+        // 3. Construir la URL pública
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const pdfUrl = `${baseUrl}/uploads/${nombreArchivo}`;
+
+        // 4. Responder al cliente
+        res.status(201).json({ 
+            message: 'Acta generada y PDF creado con éxito', 
+            id: docRef.id, 
+            pdfUrl: pdfUrl,
+            nombreArchivo: nombreArchivo,
+            ...nuevaActa 
+        });
     } catch (error) {
+        console.error("Error al generar el acta o PDF:", error);
         res.status(500).json({ error: error.message });
     }
 });

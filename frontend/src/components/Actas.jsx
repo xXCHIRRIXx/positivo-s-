@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { jsPDF } from 'jspdf';
-import { autoTable } from 'jspdf-autotable';
 import { auth } from '../auth/firebase.config';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -126,7 +124,10 @@ export default function Actas() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Error al generar el acta');
 
-      generarPDFOficial(payloadActa);
+      // Apertura automática del PDF generado en el servidor mediante Puppeteer
+      if (data.pdfUrl) {
+        window.open(data.pdfUrl, '_blank');
+      }
 
       setMensaje(`¡Acta de ${tipoActa} generada y PDF descargado con éxito!`);
       
@@ -142,127 +143,6 @@ export default function Actas() {
     } catch (err) {
       setError(err.message);
     }
-  };
-
-  const generarPDFOficial = (acta) => {
-    const doc = new jsPDF();
-    
-    // --- PÁGINA 1 ---
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("POSITIVO S+ IT SOLUTIONS S.A.S.", 14, 15);
-    doc.setFontSize(9);
-    doc.text("A-ACT-00429 | Versión: 2.0 | Fecha: 10/01/2025", 14, 20);
-
-    doc.setFontSize(12);
-    doc.text("ACTA HERRAMIENTAS DE TRABAJO PARA COLABORADORES", 14, 28);
-    doc.setFontSize(10);
-    doc.setTextColor(15, 118, 110);
-    doc.text(`ASUNTO: ${acta.tipoActa.toUpperCase()}`, 14, 34);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(50, 50, 50);
-
-    const textoIntro = acta.tipoActa === 'Asignación'
-      ? "Con el objetivo de mantener un adecuado control de los activos, herramientas e implementos que son propiedad de POSITIVO S+ IT SOLUTIONS S.A.S. y que han sido entregados para la gestión de su labor, se informa que absolutamente todos los movimientos deberán ser notificados oportunamente al área de Service Desk."
-      : "Con el objetivo de quedar a paz y salvo en todo concepto de entrega de elementos y mantener un adecuado control de los activos que son propiedad de POSITIVO S+ IT SOLUTIONS S.A.S., se entregan los siguientes elementos:";
-
-    doc.text(textoIntro, 14, 40, { maxWidth: 180 });
-
-    let startYColab = 52;
-    doc.setFont("helvetica", "bold");
-    doc.text("DATOS DEL COLABORADOR", 14, startYColab);
-    
-    const datosColab = [
-      ["Nombres Completos:", acta.nombresColaborador],
-      ["Identificación:", acta.identificacion],
-      ["Correo Corporativo:", acta.correoCorporativo],
-      ["Cargo:", acta.cargo],
-      ["Centro de Resultados:", acta.centroResultados],
-      ["Líder Inmediato:", acta.liderInmediato],
-      [acta.tipoActa === 'Asignación' ? "Fecha de Asignación:" : "Fecha de Devolución:", acta.fechaAsignacion],
-      ["Sede Registro:", acta.auditoria_sede],
-      ["Registrado Por:", acta.nombreResponsable]
-    ];
-
-    autoTable(doc, {
-      startY: startYColab + 2,
-      body: datosColab,
-      theme: 'plain',
-      styles: { fontSize: 8, cellPadding: 1 },
-      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 45 } }
-    });
-
-    let nextY = doc.lastAutoTable.finalY + 6;
-    doc.setFont("helvetica", "bold");
-    doc.text("IMPLEMENTOS / ELEMENTOS TECNOLÓGICOS", 14, nextY);
-
-    const tableColumn = ["Tipo", "Elemento / Modelo", "Serial", "Estado", "Observaciones"];
-    const tableRows = acta.equipos.map(eq => [
-      eq.tipo,
-      eq.modelo,
-      eq.serial,
-      eq.estado,
-      eq.observacion
-    ]);
-
-    autoTable(doc, {
-      startY: nextY + 2,
-      head: [tableColumn],
-      body: tableRows,
-      theme: 'grid',
-      headStyles: { fillColor: [15, 118, 110] },
-      styles: { fontSize: 8 }
-    });
-
-    // --- PÁGINA 2 ---
-    doc.addPage();
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    
-    let textY = 20;
-    const parrafo1 = "Como empleado de POSITIVO S+ IT SOLUTIONS S.A.S., declaro que los activos relacionados en el presente documento están bajo mi responsabilidad y como tal les daré un uso adecuado, responsable y aceptable para el desempeño eficiente de mis funciones.";
-    doc.text(parrafo1, 14, textY, { maxWidth: 180 });
-
-    textY += 15;
-    const parrafo2 = "En consecuencia, serán asumidos por mí, cualquier daño o pérdida que les llegaré a causar a los mismos, debido a mi negligencia en el uso de dichos activos o por el incumplimiento de los instructivos relacionados con su uso y conservación. Así mismo, reconozco y acepto que el mal uso de las herramientas de trabajo podrá constituir una falta grave que podría dar lugar a la terminación del contrato de trabajo con justa causa.";
-    doc.text(parrafo2, 14, textY, { maxWidth: 180 });
-
-    textY += 22;
-    const parrafo3 = "En caso de que llegare a producirse mi desvinculación laboral, AUTORIZO expresamente a POSITIVO S+ IT SOLUTIONS S.A.S., identificada con NIT 900.675.394-8, para que deduzca de mi salario, prestaciones sociales o liquidación el valor total de las herramientas si no fueron devueltas, de conformidad con los Artículos 149 y 150 del Código Sustantivo de Trabajo.";
-    doc.text(parrafo3, 14, textY, { maxWidth: 180 });
-
-    textY += 22;
-    const parrafo4 = "Así mismo, AUTORIZO AL FONDO DE CESANTÍAS para que retenga a favor de la sociedad la suma pendiente de pago, de conformidad con el Artículo 29 del Decreto 1063 de 1991. El presente acuerdo no vulnerará el DERECHO AL MÍNIMO VITAL equivalente a un (01) S.M.L.M.V.";
-    doc.text(parrafo4, 14, textY, { maxWidth: 180 });
-
-    let firmaY = textY + 35;
-    doc.setLineWidth(0.4);
-    doc.line(14, firmaY, 85, firmaY);
-    doc.line(120, firmaY, 191, firmaY);
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text("RECIBIÓ (Colaborador):", 14, firmaY + 5);
-    doc.text("ENTREGÓ / RESPONSABLE:", 120, firmaY + 5);
-
-    doc.setFont("helvetica", "normal");
-    doc.text(`Nombres: ${acta.nombresColaborador}`, 14, firmaY + 10);
-    doc.text(`Cédula: ${acta.identificacion}`, 14, firmaY + 15);
-    doc.text("Firma: __________________________", 14, firmaY + 22);
-
-    doc.text(`Nombres: ${acta.nombreResponsable}`, 120, firmaY + 10);
-    doc.text(`Cédula: ${acta.identificacionResponsable || 'N/A'}`, 120, firmaY + 15);
-    doc.text("Firma: __________________________", 120, firmaY + 22);
-
-    const tipoLimpio = acta.tipoActa.toUpperCase();
-    const nombreLimpio = acta.nombresColaborador.trim().replace(/\s+/g, '_').toUpperCase();
-    const identificacionLimpia = acta.identificacion.trim();
-    const fechaLimpia = acta.fechaAsignacion;
-
-    doc.save(`ACTA_${tipoLimpio}_${nombreLimpio}_${identificacionLimpia}_${fechaLimpia}.pdf`);
   };
 
   return (
