@@ -137,7 +137,7 @@ export default function Dashboard() {
 
       // Apuntamos a la ruta general /api/usuarios/actualizar para evitar fallos de parámetros con el email en la URL
       const response = await fetch(`http://localhost:4000/api/usuarios/actualizar`, {
-        method: 'PUT',
+        method: 'POST',
         body: formData
       });
 

@@ -6,6 +6,7 @@ export default function AuthForm() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     nombre: '',
     cargo: ''
   });
@@ -23,6 +24,18 @@ export default function AuthForm() {
     setError('');
     setMensaje('');
 
+    // Validaciones de seguridad en Registro
+    if (!isLogin) {
+      if (formData.password.length < 6) {
+        setError('La contraseña debe tener al menos 6 caracteres.');
+        return;
+      }
+      if (formData.password !== formData.confirmPassword) {
+        setError('Las contraseñas no coinciden.');
+        return;
+      }
+    }
+
     const endpoint = isLogin
       ? 'http://localhost:4000/api/auth/login'
       : 'http://localhost:4000/api/auth/register';
@@ -37,13 +50,11 @@ export default function AuthForm() {
 
       if (!response.ok) throw new Error(data.error || 'Ocurrió un error');
 
-      // Extraer datos del backend o de lo ingresado en el formulario
       const userObj = data.usuario || data.user || {};
       const emailFinal = userObj.email || userObj.correo || formData.email;
       const nombreFinal = userObj.nombre || formData.nombre || emailFinal.split('@')[0];
       const cargoFinal = userObj.cargo || formData.cargo || 'Asociado';
 
-      // Guardar en localStorage para usarlos en el Chat y en toda la app
       localStorage.setItem('usuarioEmail', emailFinal);
       localStorage.setItem('usuarioNombre', nombreFinal);
       localStorage.setItem('usuarioCargo', cargoFinal);
@@ -169,12 +180,31 @@ export default function AuthForm() {
                 type="password"
                 name="password"
                 required
+                minLength={!isLogin ? 6 : undefined}
                 value={formData.password}
                 onChange={handleChange}
                 className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500 transition-colors"
                 placeholder="••••••••"
               />
             </div>
+
+            {!isLogin && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
+                  Confirmar Contraseña
+                </label>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  required={!isLogin}
+                  minLength={6}
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                  placeholder="••••••••"
+                />
+              </div>
+            )}
 
             <button
               type="submit"
