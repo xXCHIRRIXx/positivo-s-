@@ -13,14 +13,13 @@ export default function AuditoriaDashboard() {
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    let usuariosMap = {}; // Mapa para relacionar UID/Email con el nombre real de la colección 'usuarios'
+    let usuariosMap = {}; 
     let equiposDocs = [];
     let actasDocs = [];
     let cargandoUsuarios = true;
     let cargandoEquipos = true;
     let cargandoActas = true;
 
-    // Función para poner la primera letra en mayúscula (ej. "JUANCHO" -> "Juancho")
     const formatearNombre = (str) => {
       if (!str) return '';
       return str
@@ -34,32 +33,22 @@ export default function AuditoriaDashboard() {
       if (cargandoUsuarios && cargandoEquipos && cargandoActas) return;
 
       const resolverResponsable = (data) => {
-        // 1. Buscar si el documento tiene un UID o correo que coincida con la colección 'usuarios'
         const posiblesReferencias = [
-          data.uidUsuario,
-          data.uid,
-          data.userId,
-          data.emailUsuario,
-          data.email,
-          data.correoCorporativo,
-          data.creadoPor,
-          data.createdBy
+          data.uidUsuario, data.uid, data.userId,
+          data.emailUsuario, data.email, data.correoCorporativo,
+          data.creadoPor, data.createdBy
         ];
 
         for (const ref of posiblesReferencias) {
           if (ref && usuariosMap[ref]) {
-            return usuariosMap[ref]; // Retorna el nombre real exacto de la base de datos (ej. "Juancho")
+            return usuariosMap[ref];
           }
         }
 
-        // 2. Si el documento tiene un nombre directo válido que no sea genérico ("Invitado", "Soporte", etc.)
         const nombresDirectos = [
-          data.nombreResponsable,
-          data.usuarioRegistro,
-          data.registradoPor,
-          data.responsable,
-          data.usuario,
-          data.nombre
+          data.nombreResponsable, data.usuarioRegistro,
+          data.registradoPor, data.responsable,
+          data.usuario, data.nombre
         ];
 
         for (const val of nombresDirectos) {
@@ -71,14 +60,14 @@ export default function AuditoriaDashboard() {
           }
         }
 
-        // 3. Si no hay ningún vínculo, mostrar No registrado para que sepas que falta vincularlo en el formulario
         return 'No registrado';
       };
 
       const equiposMapeados = equiposDocs.map(doc => {
         const data = doc.data();
         let fechaFormateada = 'Sin fecha';
-        const rawFecha = data.fechaRegistro || data.createdAt || data.fecha;
+        
+        const rawFecha = data.fechaRegistro || data.createdAt || data.fecha || data.timestamp || data.date || data.fechaCreacion;
         if (rawFecha) {
           fechaFormateada = typeof rawFecha.toDate === 'function' 
             ? rawFecha.toDate().toLocaleString() 
@@ -100,12 +89,15 @@ export default function AuditoriaDashboard() {
       const actasMapeadas = actasDocs.map(doc => {
         const data = doc.data();
         let fechaFormateada = 'Sin fecha';
-        const rawFecha = data.fechaGeneracion || data.createdAt || data.fecha;
+        
+        const rawFecha = data.fechaGeneracion || data.createdAt || data.fecha || data.timestamp || data.date || data.fechaCreacion;
         if (rawFecha) {
           fechaFormateada = typeof rawFecha.toDate === 'function' 
             ? rawFecha.toDate().toLocaleString() 
             : new Date(rawFecha).toLocaleString();
         }
+
+        const colaboradorNombre = data.nombresColaborador || data.colaborador || data.nombreColaborador || data.empleado || data.destinatario || data.nombreCompleto || data.trabajador || 'N/A';
 
         return {
           id: doc.id,
@@ -115,7 +107,7 @@ export default function AuditoriaDashboard() {
           sede: data.sede || data.ubicacion || 'Bogotá',
           modulo: 'Actas',
           accion: data.tipoActa || 'Generación de Acta',
-          detalle: `Acta para colaborador: ${data.colaborador || data.nombreColaborador || 'N/A'}`
+          detalle: `Acta para colaborador: ${colaboradorNombre}`
         };
       });
 
@@ -129,7 +121,6 @@ export default function AuditoriaDashboard() {
         const nombreReal = uData.nombre || uData.name || uData.displayName || uData.nombres;
         if (nombreReal) {
           const nombreLimpio = formatearNombre(nombreReal);
-          // Guardar referencias en el mapa usando ID, UID y Email
           usuariosMap[doc.id] = nombreLimpio;
           if (uData.uid) usuariosMap[uData.uid] = nombreLimpio;
           if (uData.email) usuariosMap[uData.email] = nombreLimpio;
@@ -139,18 +130,18 @@ export default function AuditoriaDashboard() {
       verificarYActualizar();
     };
 
-    const unsubUsuarios = onSnapshot(collection(db, 'usuarios'), procesarSnapshotUsuarios, (err) => {
+    const unsubUsuarios = onSnapshot(collection(db, 'usuarios'), procesarSnapshotUsuarios, () => {
       cargandoUsuarios = false;
       verificarYActualizar();
     });
     
-    const unsubUsers = onSnapshot(collection(db, 'users'), procesarSnapshotUsuarios, (err) => {});
+    const unsubUsers = onSnapshot(collection(db, 'users'), procesarSnapshotUsuarios, () => {});
 
     const unsubEquipos = onSnapshot(collection(db, 'equipos'), (snapshot) => {
       equiposDocs = snapshot.docs;
       cargandoEquipos = false;
       verificarYActualizar();
-    }, (error) => {
+    }, () => {
       cargandoEquipos = false;
       verificarYActualizar();
     });
@@ -159,7 +150,7 @@ export default function AuditoriaDashboard() {
       actasDocs = snapshot.docs;
       cargandoActas = false;
       verificarYActualizar();
-    }, (error) => {
+    }, () => {
       cargandoActas = false;
       verificarYActualizar();
     });
@@ -174,9 +165,20 @@ export default function AuditoriaDashboard() {
 
   const logsFiltrados = logs.filter(log => {
     const coincideSede = filtroSede === 'Todas' || log.sede === filtroSede;
-    const coincideAccion = filtroAccion === 'Todas' || (log.accion && log.accion.toLowerCase().includes(filtroAccion.toLowerCase()));
-    const textoBusqueda = busqueda.toLowerCase();
     
+    // Lógica de filtrado de acción corregida:
+    let coincideAccion = true;
+    if (filtroAccion !== 'Todas') {
+      if (filtroAccion === 'Acta') {
+        coincideAccion = log.modulo === 'Actas'; // Muestra todas las actas (asignación, devolución, etc.)
+      } else if (filtroAccion === 'Registro') {
+        coincideAccion = log.modulo === 'Inventario';
+      } else {
+        coincideAccion = log.accion && log.accion.toLowerCase().includes(filtroAccion.toLowerCase());
+      }
+    }
+
+    const textoBusqueda = busqueda.toLowerCase();
     const coincideBusqueda = 
       (log.responsable && log.responsable.toLowerCase().includes(textoBusqueda)) ||
       (log.detalle && log.detalle.toLowerCase().includes(textoBusqueda)) ||
@@ -237,7 +239,9 @@ export default function AuditoriaDashboard() {
             >
               <option value="Todas">Todas las Acciones</option>
               <option value="Registro">Registro de Equipo</option>
-              <option value="Acta">Generación de Acta</option>
+              <option value="Acta">Generación de Acta (Todas)</option>
+              <option value="Asignación">Asignación</option>
+              <option value="Devolución">Devolución</option>
             </select>
           </div>
         </div>

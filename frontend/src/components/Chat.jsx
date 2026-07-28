@@ -21,9 +21,10 @@ export default function Chat() {
   const [textoMensaje, setTextoMensaje] = useState('');
   const [archivoAdjunto, setArchivoAdjunto] = useState(null);
 
-  // Lista de asociados registrados y filtro de búsqueda
+  // Lista de asociados registrados, mapa de usuarios y filtro de búsqueda
   const [busqueda, setBusqueda] = useState('');
   const [usuarios, setUsuarios] = useState([]);
+  const [usuariosMap, setUsuariosMap] = useState({});
 
   // Responsive / Menú lateral móvil
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -37,14 +38,27 @@ export default function Chat() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 1. Cargar la lista completa de asociados desde el Backend y sincronizar tu perfil exacto
+  // 1. Cargar la lista completa de asociados, actualizar perfil y construir mapa de nombres en tiempo real
   const obtenerUsuarios = async () => {
     try {
       const response = await fetch('http://localhost:4000/api/usuarios');
       if (response.ok) {
         const data = await response.json();
 
-        // Buscar tu propio usuario dentro del listado general (asegurando el cargo real)
+        // Construir mapa de usuarios por correo para actualizar nombres dinámicamente en los mensajes
+        const map = {};
+        data.forEach(u => {
+          const emailU = u.email || u.correo;
+          if (emailU) {
+            map[emailU.toLowerCase()] = {
+              nombre: u.nombre || u.name || 'Asociado',
+              cargo: u.cargo || u.puesto || u.rol || 'Asociado',
+              foto: u.foto || ''
+            };
+          }
+        });
+
+        // Buscar tu propio usuario dentro del listado general (asegurando el cargo y nombre real)
         const miUsuarioEnBD = data.find(u => {
           const emailU = u.email || u.correo;
           return emailU && miEmail && emailU.toLowerCase() === miEmail.toLowerCase();
@@ -62,7 +76,21 @@ export default function Chat() {
           localStorage.setItem('usuarioNombre', nombreFinal);
           localStorage.setItem('usuarioCargo', cargoFinal);
           localStorage.setItem('usuarioFoto', fotoFinal);
+
+          map[miEmail.toLowerCase()] = {
+            nombre: nombreFinal,
+            cargo: cargoFinal,
+            foto: fotoFinal
+          };
+        } else {
+          map[miEmail.toLowerCase()] = {
+            nombre: miNombre,
+            cargo: miCargo,
+            foto: miFoto
+          };
         }
+
+        setUsuariosMap(map);
 
         // Filtrar para no mostrarme a mí mismo en la lista de contactos a escribir
         const otrosUsuarios = data.filter(u => {
@@ -76,11 +104,7 @@ export default function Chat() {
     }
   };
 
-  useEffect(() => {
-    obtenerUsuarios();
-  }, [miEmail]);
-
-  // 2. Cargar los mensajes del chat activo (General o Privado)
+  // 2. Cargar los mensajes del chat activo
   const obtenerMensajes = async () => {
     try {
       const response = await fetch(`http://localhost:4000/api/chat/${chatActivo.id}/mensajes`);
@@ -94,10 +118,14 @@ export default function Chat() {
   };
 
   useEffect(() => {
+    obtenerUsuarios();
     obtenerMensajes();
-    const interval = setInterval(obtenerMensajes, 2500); // Refresco automático cada 2.5s
+    const interval = setInterval(() => {
+      obtenerUsuarios();
+      obtenerMensajes();
+    }, 2500); // Sincronización automática de usuarios y mensajes cada 2.5s
     return () => clearInterval(interval);
-  }, [chatActivo.id]);
+  }, [chatActivo.id, miEmail]);
 
   useEffect(() => {
     mensajesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -109,7 +137,6 @@ export default function Chat() {
     const nombreDestino = asociado.nombre || emailDestino;
     const cargoDestino = asociado.cargo || asociado.puesto || asociado.rol || 'Asociado';
 
-    // Generar un ID único e idéntico para ambos usuarios (ordenando alfabéticamente sus correos)
     const correosOrdenados = [miEmail.toLowerCase(), emailDestino.toLowerCase()].sort();
     const idPrivado = `dm_${correosOrdenados[0]}_${correosOrdenados[1]}`.replace(/[^a-zA-Z0-9_]/g, '_');
 
@@ -124,7 +151,7 @@ export default function Chat() {
     if (isMobile) setSidebarOpen(false);
   };
 
-  // 4. Enviar Mensaje con Firma Completa (Nombre, Cargo, Correo y Fecha)
+  // 4. Enviar Mensaje con Firma Completa
   const enviarMensaje = async (e) => {
     e.preventDefault();
     if (!textoMensaje.trim() && !archivoAdjunto) return;
@@ -341,11 +368,24 @@ export default function Chat() {
             </div>
           ) : (
             mensajes.map((msg, idx) => {
-              const remitenteCorreo = msg.remitenteEmail || msg.remitente;
-              const esMio = remitenteCorreo && remitenteCorreo.toLowerCase() === miEmail.toLowerCase();
+              const remitenteCorreo = (msg.remitenteEmail || msg.remitente || '').toLowerCase();
+              const esMio = remitenteCorreo === miEmail.toLowerCase();
               
-              const nombreMostrar = msg.remitenteNombre || msg.remitente || 'Asociado';
-              const cargoMostrar = msg.remitenteCargo || msg.cargo || 'Asociado';
+              // Resolución dinámica del nombre y cargo actual del remitente
+              let nombreMostrar = msg.remitenteNombre;
+              let cargoMostrar = msg.remitenteCargo;
+
+              if (esMio) {
+                nombreMostrar = miNombre;
+                cargoMostrar = miCargo;
+              } else if (remitenteCorreo && usuariosMap[remitenteCorreo]) {
+                nombreMostrar = usuariosMap[remitenteCorreo].nombre;
+                cargoMostrar = usuariosMap[remitenteCorreo].cargo;
+              } else {
+                nombreMostrar = msg.remitenteNombre || msg.remitente || 'Asociado';
+                cargoMostrar = msg.remitenteCargo || msg.cargo || 'Asociado';
+              }
+
               const tiempoMostrar = formatearFechaHora(msg.fechaHora || msg.fecha);
 
               return (
@@ -812,7 +852,7 @@ const styles = {
   },
   msgBodyText: {
     fontSize: '0.88rem',
-    lineH: '1.4',
+    lineHeight: '1.4',
     wordBreak: 'break-word'
   },
   imageAttachment: {

@@ -16,7 +16,7 @@ export default function Actas() {
   const [liderInmediato, setLiderInmediato] = useState('');
   const [fechaAsignacion, setFechaAsignacion] = useState(new Date().toISOString().split('T')[0]);
 
-  // Estados sincronizados con Firebase Auth y datos del responsable con consistencia total
+  // Estados sincronizados con Firebase Auth y datos del responsable
   const [nombreResponsable, setNombreResponsable] = useState('');
   const [emailResponsable, setEmailResponsable] = useState('');
   const [uidResponsable, setUidResponsable] = useState('');
@@ -39,6 +39,9 @@ export default function Actas() {
   const [serialItem, setSerialItem] = useState('');
   const [estadoFisicoItem, setEstadoFisicoItem] = useState('Bueno');
   const [observacionItem, setObservacionItem] = useState('');
+
+  // Estado para las novedades generales del acta
+  const [novedades, setNovedades] = useState('');
 
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
@@ -95,6 +98,7 @@ export default function Actas() {
       liderInmediato,
       fechaAsignacion,
       equipos: equiposSeleccionados,
+      novedades: novedades.trim() || 'Ninguna',
       nombreResponsable,
       emailResponsable,
       uidResponsable,
@@ -124,14 +128,15 @@ export default function Actas() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Error al generar el acta');
 
-      // Apertura automática del PDF generado en el servidor mediante Puppeteer
       if (data.pdfUrl) {
         window.open(data.pdfUrl, '_blank');
       }
 
       setMensaje(`¡Acta de ${tipoActa} generada y PDF descargado con éxito!`);
       
+      // Limpieza completa de formularios al éxito
       setNombreResponsable('');
+      setIdentificacionResponsable('');
       setNombresColaborador('');
       setIdentificacion('');
       setCorreoCorporativo('');
@@ -139,6 +144,7 @@ export default function Actas() {
       setCentroResultados('');
       setLiderInmediato('');
       setEquiposSeleccionados([]);
+      setNovedades('');
 
     } catch (err) {
       setError(err.message);
@@ -317,7 +323,6 @@ export default function Actas() {
             <h3 className="text-lg font-bold text-cyan-300 mb-4">Registro de Elementos / Equipos</h3>
             
             <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-700 grid grid-cols-1 md:grid-cols-6 gap-3 items-end mb-4">
-              
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Tipo</label>
                 <select
@@ -389,11 +394,10 @@ export default function Actas() {
                   + Agregar
                 </button>
               </div>
-
             </div>
 
             {equiposSeleccionados.length > 0 ? (
-              <div className="overflow-x-auto border border-slate-700 rounded-xl">
+              <div className="overflow-x-auto border border-slate-700 rounded-xl mb-6">
                 <table className="w-full text-left text-sm text-slate-300">
                   <thead className="bg-slate-900 text-xs uppercase text-cyan-400">
                     <tr>
@@ -434,10 +438,21 @@ export default function Actas() {
                 </table>
               </div>
             ) : (
-              <p className="text-sm text-slate-500 italic text-center py-4 bg-slate-900/30 rounded-xl border border-dashed border-slate-700">
+              <p className="text-sm text-slate-500 italic text-center py-4 bg-slate-900/30 rounded-xl border border-dashed border-slate-700 mb-6">
                 No hay elementos agregados todavía. Complete los campos superiores y presione "+ Agregar".
               </p>
             )}
+
+            <div>
+              <label className="block text-xs font-semibold text-cyan-300 uppercase mb-2">Novedades / Observaciones Generales del Acta</label>
+              <textarea
+                value={novedades}
+                onChange={(e) => setNovedades(e.target.value)}
+                placeholder="Escriba aquí cualquier novedad o comentario adicional general (Opcional)..."
+                rows="2"
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500"
+              ></textarea>
+            </div>
 
           </div>
 
