@@ -112,6 +112,7 @@ export default function Equipos() {
 
       const asignadoVal = formData.disponibilidad === 'Asignado' ? formData.asignadoA : '';
       const idVal = formData.disponibilidad === 'Asignado' ? formData.identificacionUsuario : '';
+      const fechaActual = new Date().toISOString();
 
       const datosAEnviar = {
         ...formData,
@@ -121,7 +122,10 @@ export default function Equipos() {
         identificacion_usuario: idVal,
         registradoPor: formData.usuarioRegistro,
         emailUsuario: emailUsuario,
-        uidUsuario: uidUsuario
+        uidUsuario: uidUsuario,
+        ...(equipoEditando 
+          ? { fechaActualizacion: fechaActual } 
+          : { fechaRegistro: fechaActual })
       };
 
       const response = await fetch(url, {
@@ -197,6 +201,8 @@ export default function Equipos() {
       'Asignado A': eq.asignadoA || eq.asignado_a || 'N/A',
       'Identificación': eq.identificacionUsuario || eq.identificacion_usuario || 'N/A',
       'Responsable': eq.usuarioRegistro || eq.registradoPor || 'N/A',
+      'Fecha Registro': eq.fechaRegistro ? new Date(eq.fechaRegistro).toLocaleString() : 'N/A',
+      'Última Actualización': eq.fechaActualizacion ? new Date(eq.fechaActualizacion).toLocaleString() : 'N/A',
       'Descripción / Observaciones': eq.descripcion || ''
     }));
 
@@ -495,7 +501,9 @@ export default function Equipos() {
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-slate-700 text-slate-400 text-xs uppercase">
-                    <th className="py-3 px-3">Serial / Modelo</th>
+                    <th className="py-3 px-3">Serial</th>
+                    <th className="py-3 px-3">Modelo</th>
+                    <th className="py-3 px-3">Fechas</th>
                     <th className="py-3 px-3">Propiedad</th>
                     <th className="py-3 px-3">Ciudad</th>
                     <th className="py-3 px-3">Estado</th>
@@ -508,7 +516,7 @@ export default function Equipos() {
                 <tbody className="divide-y divide-slate-700/50 text-xs">
                   {equiposFiltrados.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-8 text-slate-500">No se encontraron equipos registrados.</td>
+                      <td colSpan={10} className="text-center py-8 text-slate-500">No se encontraron equipos registrados.</td>
                     </tr>
                   ) : (
                     equiposFiltrados.map((eq) => {
@@ -518,9 +526,23 @@ export default function Equipos() {
 
                       return (
                         <tr key={eq.id} className="hover:bg-slate-700/30 transition-colors">
-                          <td className="py-3 px-3">
-                            <div className="font-bold text-white font-mono">{eq.serial}</div>
-                            <div className="text-[11px] text-slate-400">{eq.modelo}</div>
+                          <td className="py-3 px-3 font-bold text-white font-mono whitespace-nowrap">
+                            {eq.serial}
+                          </td>
+                          <td className="py-3 px-3 text-slate-300">
+                            {eq.modelo}
+                          </td>
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            <div className="space-y-0.5">
+                              <div className="text-[10px] text-slate-400">
+                                📅 <span className="text-slate-300">Reg:</span> {eq.fechaRegistro ? new Date(eq.fechaRegistro).toLocaleString() : 'N/A'}
+                              </div>
+                              {eq.fechaActualizacion && (
+                                <div className="text-[10px] text-amber-400/90">
+                                  ✏️ <span className="text-amber-300">Act:</span> {new Date(eq.fechaActualizacion).toLocaleString()}
+                                </div>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3 px-3">
                             <span className={`px-2 py-0.5 rounded-full font-semibold border ${

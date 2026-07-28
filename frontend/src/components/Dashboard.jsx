@@ -364,7 +364,7 @@ export default function Dashboard() {
               <div className="w-12 h-12 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-center text-purple-400 text-2xl mb-3 group-hover:scale-110 transition-transform">
                 📜
               </div>
-              <h3 className="font-bold text-white text-base group-hover:text-purple-300 transition-colors">Historial / Auditoría</h3>
+              <h3 className="font-bold text-white text-base group-hover:text-purple-300 transition-colors">Historial / Trazabilidad</h3>
               <p className="text-xs text-slate-400 mt-1 leading-relaxed">Trazabilidad de cambios y logs.</p>
               <div className="mt-4 flex items-center text-[11px] font-semibold text-purple-400 opacity-80 group-hover:opacity-100">
                 <span>Acceder</span>

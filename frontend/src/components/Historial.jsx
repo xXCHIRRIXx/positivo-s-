@@ -9,6 +9,7 @@ export default function AuditoriaDashboard() {
   const [busqueda, setBusqueda] = useState('');
   const [filtroSede, setFiltroSede] = useState('Todas');
   const [filtroAccion, setFiltroAccion] = useState('Todas');
+  const [filtroFecha, setFiltroFecha] = useState('');
   const [logs, setLogs] = useState([]);
   const [cargando, setCargando] = useState(true);
 
@@ -66,18 +67,26 @@ export default function AuditoriaDashboard() {
       const equiposMapeados = equiposDocs.map(doc => {
         const data = doc.data();
         let fechaFormateada = 'Sin fecha';
+        let fechaObj = null;
         
         const rawFecha = data.fechaRegistro || data.createdAt || data.fecha || data.timestamp || data.date || data.fechaCreacion;
         if (rawFecha) {
-          fechaFormateada = typeof rawFecha.toDate === 'function' 
-            ? rawFecha.toDate().toLocaleString() 
-            : new Date(rawFecha).toLocaleString();
+          fechaObj = typeof rawFecha.toDate === 'function' 
+            ? rawFecha.toDate() 
+            : new Date(rawFecha);
+          
+          if (!isNaN(fechaObj.getTime())) {
+            fechaFormateada = fechaObj.toLocaleString();
+          } else {
+            fechaObj = null;
+          }
         }
 
         return {
           id: doc.id,
           idAuditoria: `EQ-${doc.id.slice(0, 5).toUpperCase()}`,
           fechaHora: fechaFormateada,
+          fechaObj: fechaObj,
           responsable: resolverResponsable(data),
           sede: data.sede || data.ubicacion || 'Bogotá',
           modulo: 'Inventario',
@@ -89,12 +98,19 @@ export default function AuditoriaDashboard() {
       const actasMapeadas = actasDocs.map(doc => {
         const data = doc.data();
         let fechaFormateada = 'Sin fecha';
+        let fechaObj = null;
         
         const rawFecha = data.fechaGeneracion || data.createdAt || data.fecha || data.timestamp || data.date || data.fechaCreacion;
         if (rawFecha) {
-          fechaFormateada = typeof rawFecha.toDate === 'function' 
-            ? rawFecha.toDate().toLocaleString() 
-            : new Date(rawFecha).toLocaleString();
+          fechaObj = typeof rawFecha.toDate === 'function' 
+            ? rawFecha.toDate() 
+            : new Date(rawFecha);
+
+          if (!isNaN(fechaObj.getTime())) {
+            fechaFormateada = fechaObj.toLocaleString();
+          } else {
+            fechaObj = null;
+          }
         }
 
         const colaboradorNombre = data.nombresColaborador || data.colaborador || data.nombreColaborador || data.empleado || data.destinatario || data.nombreCompleto || data.trabajador || 'N/A';
@@ -103,6 +119,7 @@ export default function AuditoriaDashboard() {
           id: doc.id,
           idAuditoria: `ACT-${doc.id.slice(0, 5).toUpperCase()}`,
           fechaHora: fechaFormateada,
+          fechaObj: fechaObj,
           responsable: resolverResponsable(data),
           sede: data.sede || data.ubicacion || 'Bogotá',
           modulo: 'Actas',
@@ -166,11 +183,10 @@ export default function AuditoriaDashboard() {
   const logsFiltrados = logs.filter(log => {
     const coincideSede = filtroSede === 'Todas' || log.sede === filtroSede;
     
-    // Lógica de filtrado de acción corregida:
     let coincideAccion = true;
     if (filtroAccion !== 'Todas') {
       if (filtroAccion === 'Acta') {
-        coincideAccion = log.modulo === 'Actas'; // Muestra todas las actas (asignación, devolución, etc.)
+        coincideAccion = log.modulo === 'Actas'; 
       } else if (filtroAccion === 'Registro') {
         coincideAccion = log.modulo === 'Inventario';
       } else {
@@ -184,7 +200,19 @@ export default function AuditoriaDashboard() {
       (log.detalle && log.detalle.toLowerCase().includes(textoBusqueda)) ||
       (log.idAuditoria && log.idAuditoria.toLowerCase().includes(textoBusqueda));
 
-    return coincideSede && coincideAccion && coincideBusqueda;
+    // Filtro por Fecha (YYYY-MM-DD)
+    let coincideFecha = true;
+    if (filtroFecha && log.fechaObj) {
+      const yyyy = log.fechaObj.getFullYear();
+      const mm = String(log.fechaObj.getMonth() + 1).padStart(2, '0');
+      const dd = String(log.fechaObj.getDate()).padStart(2, '0');
+      const fechaLogStr = `${yyyy}-${mm}-${dd}`;
+      coincideFecha = fechaLogStr === filtroFecha;
+    } else if (filtroFecha && !log.fechaObj) {
+      coincideFecha = false;
+    }
+
+    return coincideSede && coincideAccion && coincideBusqueda && coincideFecha;
   });
 
   return (
@@ -192,7 +220,7 @@ export default function AuditoriaDashboard() {
       
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-indigo-400">Auditoría y Trazabilidad</h1>
+          <h1 className="text-3xl font-extrabold text-indigo-400">Historial / Trazabilidad</h1>
           <p className="text-slate-400 text-sm mt-1">Registro en tiempo real de equipos ingresados y actas generadas por sede.</p>
         </div>
         <button 
@@ -205,7 +233,8 @@ export default function AuditoriaDashboard() {
 
       <div className="max-w-7xl mx-auto bg-slate-800/80 border border-slate-700 rounded-2xl p-6 shadow-xl">
         
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 pb-6 border-b border-slate-700">
+        {/* Controles de búsqueda y filtros */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6 pb-6 border-b border-slate-700">
           <div className="md:col-span-2">
             <label className="block text-xs font-semibold text-slate-300 uppercase mb-2">Buscar (Responsable, Detalle, ID)</label>
             <input
@@ -243,6 +272,16 @@ export default function AuditoriaDashboard() {
               <option value="Asignación">Asignación</option>
               <option value="Devolución">Devolución</option>
             </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-indigo-300 uppercase mb-2">Fecha</label>
+            <input
+              type="date"
+              value={filtroFecha}
+              onChange={(e) => setFiltroFecha(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-900 border border-indigo-500/50 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-400"
+            />
           </div>
         </div>
 
@@ -296,8 +335,8 @@ export default function AuditoriaDashboard() {
           </div>
         ) : (
           <div className="text-center py-12 bg-slate-900/30 rounded-xl border border-dashed border-slate-700">
-            <p className="text-sm text-slate-400 italic">No hay registros de equipos ni de actas guardados en la base de datos todavía.</p>
-            <p className="text-xs text-slate-500 mt-1">Los movimientos aparecerán aquí en tiempo real en cuanto registres un equipo o generes un acta.</p>
+            <p className="text-sm text-slate-400 italic">No hay registros que coincidan con los filtros seleccionados.</p>
+            <p className="text-xs text-slate-500 mt-1">Prueba cambiando los parámetros de búsqueda o la fecha.</p>
           </div>
         )}
 
