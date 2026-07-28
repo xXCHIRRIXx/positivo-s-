@@ -297,6 +297,19 @@ app.post('/api/actas', async (req, res) => {
             return res.status(400).json({ error: 'Debe incluir al menos un equipo en el acta.' });
         }
 
+        // 1. Ejecutar la generación del PDF con Puppeteer primero para obtener el nombre del archivo
+        const pdfResult = await generarActaPDF(datosActa);
+        let nombreArchivo = null;
+        if (typeof pdfResult === 'string') {
+            nombreArchivo = path.basename(pdfResult);
+        } else if (pdfResult && typeof pdfResult === 'object') {
+            nombreArchivo = pdfResult.nombreArchivo || pdfResult.filename || pdfResult.file || pdfResult.name;
+        }
+
+        if (!nombreArchivo) {
+            nombreArchivo = `acta_${Date.now()}.pdf`;
+        }
+
         const responsableFinal = datosActa.nombreResponsable || datosActa.usuarioRegistro || 'Soporte Técnico Positivo';
 
         const nuevaActa = {
@@ -311,22 +324,54 @@ app.post('/api/actas', async (req, res) => {
             equipos: datosActa.equipos,
             nombreResponsable: responsableFinal,
             identificacionResponsable: datosActa.identificacionResponsable || 'N/A',
+            nombreArchivo: nombreArchivo, // Guardamos la referencia para el historial/visualización
             fechaCreacion: new Date().toISOString()
         };
 
-        // 1. Guardar registro en Firestore
+        // 2. Guardar registro general en la colección 'actas' de Firestore con el nombreArchivo incluido
         const docRef = await db.collection('actas').add(nuevaActa);
 
-        // 2. Ejecutar la generación del PDF con Puppeteer
-        const { nombreArchivo } = await generarActaPDF(datosActa);
+        // 3. ACTUALIZAR CADA EQUIPO INVOLUCRADO EN FIRESTORE (Vincular acta y estado)
+        const tipoActaLower = (datosActa.tipoActa || 'Asignación').toLowerCase();
+        const esDevolucion = tipoActaLower.includes('devolución') || tipoActaLower.includes('devolucion');
 
-        // 3. Construir la URL pública
+        for (const eq of datosActa.equipos) {
+            const serialEquipo = eq.serial || eq.numeroSerial;
+            if (serialEquipo) {
+                const equipoSnapshot = await db.collection('equipos').where('serial', '==', serialEquipo).get();
+                
+                if (!equipoSnapshot.empty) {
+                    const equipoDocRef = equipoSnapshot.docs[0].ref;
+                    const datosEquipoActual = equipoSnapshot.docs[0].data();
+
+                    const camposActualizacion = {
+                        fechaActualizacion: new Date().toISOString()
+                    };
+
+                    if (esDevolucion) {
+                        camposActualizacion.actaDevolucion = nombreArchivo;
+                        camposActualizacion.disponibilidad = 'Disponible';
+                        camposActualizacion.asignadoA = null;
+                        camposActualizacion.identificacionUsuario = null;
+                    } else {
+                        camposActualizacion.actaAsignacion = nombreArchivo;
+                        camposActualizacion.disponibilidad = 'Asignado';
+                        camposActualizacion.asignadoA = datosActa.nombresColaborador || datosEquipoActual.asignadoA;
+                        camposActualizacion.identificacionUsuario = datosActa.identificacion || datosEquipoActual.identificacionUsuario;
+                    }
+
+                    await equipoDocRef.update(camposActualizacion);
+                }
+            }
+        }
+
+        // 4. Construir la URL pública
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const pdfUrl = `${baseUrl}/uploads/${nombreArchivo}`;
 
-        // 4. Responder al cliente
+        // 5. Responder al cliente
         res.status(201).json({ 
-            message: 'Acta generada y PDF creado con éxito', 
+            message: 'Acta generada, PDF creado y equipos actualizados con éxito', 
             id: docRef.id, 
             pdfUrl: pdfUrl,
             nombreArchivo: nombreArchivo,
@@ -341,7 +386,16 @@ app.post('/api/actas', async (req, res) => {
 app.get('/api/actas', async (req, res) => {
     try {
         const snapshot = await db.collection('actas').get();
-        const actas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        
+        const actas = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                pdfUrl: data.nombreArchivo ? `${baseUrl}/uploads/${data.nombreArchivo}` : null
+            };
+        });
         res.status(200).json(actas);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -355,7 +409,14 @@ app.get('/api/actas/:id', async (req, res) => {
         if (!docSnap.exists) {
             return res.status(404).json({ error: 'El acta no existe en la base de datos.' });
         }
-        res.status(200).json({ id: docSnap.id, ...docSnap.data() });
+        const data = docSnap.data();
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+        res.status(200).json({ 
+            id: docSnap.id, 
+            ...data,
+            pdfUrl: data.nombreArchivo ? `${baseUrl}/uploads/${data.nombreArchivo}` : null
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -91,7 +91,8 @@ export default function AuditoriaDashboard() {
           sede: data.sede || data.ubicacion || 'Bogotá',
           modulo: 'Inventario',
           accion: 'Registro de Equipo',
-          detalle: `Equipo: ${data.tipo || data.marca || data.modelo || 'Dispositivo'} (Serial: ${data.serial || data.serialEquipo || 'N/A'})`
+          detalle: `Equipo: ${data.tipo || data.marca || data.modelo || 'Dispositivo'} (Serial: ${data.serial || data.serialEquipo || 'N/A'})`,
+          pdfUrl: null
         };
       });
 
@@ -115,6 +116,13 @@ export default function AuditoriaDashboard() {
 
         const colaboradorNombre = data.nombresColaborador || data.colaborador || data.nombreColaborador || data.empleado || data.destinatario || data.nombreCompleto || data.trabajador || 'N/A';
 
+        // Construcción de la URL del PDF basándose en el nombreArchivo o pdfUrl que entrega el backend
+        let pdfUrlFinal = data.pdfUrl || null;
+        if (!pdfUrlFinal && data.nombreArchivo) {
+          const origin = window.location.origin.includes('localhost') ? 'http://localhost:4000' : window.location.origin;
+          pdfUrlFinal = `${origin}/uploads/${data.nombreArchivo}`;
+        }
+
         return {
           id: doc.id,
           idAuditoria: `ACT-${doc.id.slice(0, 5).toUpperCase()}`,
@@ -124,7 +132,8 @@ export default function AuditoriaDashboard() {
           sede: data.sede || data.ubicacion || 'Bogotá',
           modulo: 'Actas',
           accion: data.tipoActa || 'Generación de Acta',
-          detalle: `Acta para colaborador: ${colaboradorNombre}`
+          detalle: `Acta para colaborador: ${colaboradorNombre}`,
+          pdfUrl: pdfUrlFinal
         };
       });
 
@@ -180,6 +189,14 @@ export default function AuditoriaDashboard() {
     };
   }, []);
 
+  const handleVerPdf = (pdfUrl) => {
+    if (pdfUrl) {
+      window.open(pdfUrl, '_blank');
+    } else {
+      alert('El archivo PDF para este registro no está disponible.');
+    }
+  };
+
   const logsFiltrados = logs.filter(log => {
     const coincideSede = filtroSede === 'Todas' || log.sede === filtroSede;
     
@@ -200,7 +217,6 @@ export default function AuditoriaDashboard() {
       (log.detalle && log.detalle.toLowerCase().includes(textoBusqueda)) ||
       (log.idAuditoria && log.idAuditoria.toLowerCase().includes(textoBusqueda));
 
-    // Filtro por Fecha (YYYY-MM-DD)
     let coincideFecha = true;
     if (filtroFecha && log.fechaObj) {
       const yyyy = log.fechaObj.getFullYear();
@@ -221,7 +237,7 @@ export default function AuditoriaDashboard() {
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-indigo-400">Historial / Trazabilidad</h1>
-          <p className="text-slate-400 text-sm mt-1">Registro en tiempo real de equipos ingresados y actas generadas por sede.</p>
+          <p className="text-slate-400 text-sm mt-1">Registro en tiempo real de equipos ingresados y actas generadas por sede. Haz clic en un registro de acta para visualizar su PDF.</p>
         </div>
         <button 
           onClick={() => navigate('/dashboard')}
@@ -299,11 +315,18 @@ export default function AuditoriaDashboard() {
                   <th className="px-4 py-3">Sede</th>
                   <th className="px-4 py-3">Acción</th>
                   <th className="px-4 py-3">Detalle del Registro</th>
+                  <th className="px-4 py-3 text-center">Acciones PDF</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700">
                 {logsFiltrados.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-900/40">
+                  <tr 
+                    key={log.id} 
+                    className={`hover:bg-slate-900/40 transition-colors ${log.pdfUrl ? 'cursor-pointer' : ''}`}
+                    onClick={() => {
+                      if (log.pdfUrl) handleVerPdf(log.pdfUrl);
+                    }}
+                  >
                     <td className="px-4 py-3">
                       <div className="font-mono text-xs text-indigo-300">{log.idAuditoria}</div>
                       <div className="text-slate-400 text-xs">{log.fechaHora}</div>
@@ -327,6 +350,19 @@ export default function AuditoriaDashboard() {
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-400 max-w-md truncate" title={log.detalle}>
                       {log.detalle}
+                    </td>
+                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      {log.pdfUrl ? (
+                        <button
+                          onClick={() => handleVerPdf(log.pdfUrl)}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow transition-all flex items-center gap-1 mx-auto"
+                          title="Ver Acta en PDF"
+                        >
+                          📄 Ver PDF
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-500 italic">No aplica</span>
+                      )}
                     </td>
                   </tr>
                 ))}
