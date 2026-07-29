@@ -483,7 +483,10 @@ const frontendDistPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendDistPath)) {
     app.use(express.static(frontendDistPath));
     
-    app.get('*', (req, res, next) => {
+    app.use(express.static(frontendDistPath));
+    
+    // CORRECCIÓN APLICADA AQUÍ (Uso de expresión regular compatible con Express 5)
+    app.get(/(.*)/, (req, res, next) => {
         if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
             return next();
         }
@@ -498,7 +501,7 @@ app.use((err, req, res, next) => {
     console.error("Error crítico capturado en servidor:", err);
     if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({ error: 'El archivo adjunto supera el límite máximo permitido de 10MB.' });
+            return res.status(0).json({ error: 'El archivo adjunto supera el límite máximo permitido de 10MB.' });
         }
         return res.status(400).json({ error: `Error en la subida del archivo: ${err.message}` });
     } else if (err) {
