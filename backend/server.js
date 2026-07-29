@@ -22,7 +22,7 @@ const PORT = process.env.PORT || 4000;
 // MIDDLEWARES GLOBALES
 // ==========================================
 app.use(cors({
-    origin: '*', // O puedes restringirlo a tu GitHub Pages: ['https://xXCHIRRIXx.github.io']
+    origin: '*', // O puedes restringirlo a tu GitHub Pages / dominio de producción
     credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -473,6 +473,22 @@ app.post('/api/chat/enviar', uploadFlexible('archivo'), async (req, res) => {
 const authRoutesPath = './routes/auth.routes';
 if (fs.existsSync(path.join(__dirname, 'routes', 'auth.routes.js')) || fs.existsSync(path.join(__dirname, 'routes', 'auth.routes'))) {
     app.use('/api/auth', require(authRoutesPath));
+}
+
+// ==========================================
+// CONFIGURACIÓN PARA SERVIR EL FRONTEND EN PRODUCCIÓN
+// ==========================================
+const frontendDistPath = path.join(__dirname, '../frontend/dist');
+
+if (fs.existsSync(frontendDistPath)) {
+    app.use(express.static(frontendDistPath));
+    
+    app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+            return next();
+        }
+        res.sendFile(path.resolve(frontendDistPath, 'index.html'));
+    });
 }
 
 // ==========================================

@@ -36,9 +36,10 @@ export default function AuthForm() {
       }
     }
 
+    // Endpoints apuntando al servidor en Render
     const endpoint = isLogin
-      ? 'http://localhost:4000/api/auth/login'
-      : 'http://localhost:4000/api/auth/register';
+      ? 'https://positivo-s.onrender.com/api/auth/login'
+      : 'https://positivo-s.onrender.com/api/auth/register';
 
     try {
       const response = await fetch(endpoint, {

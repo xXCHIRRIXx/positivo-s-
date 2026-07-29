@@ -38,10 +38,10 @@ export default function Chat() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 1. Cargar la lista completa de asociados, actualizar perfil y construir mapa de nombres en tiempo real
+  // 1. Cargar la lista completa de asociados, actualizar perfil y construir mapa de nombres en tiempo real (Backend Render)
   const obtenerUsuarios = async () => {
     try {
-      const response = await fetch('http://localhost:4000/api/usuarios');
+      const response = await fetch('https://positivo-s.onrender.com/api/usuarios');
       if (response.ok) {
         const data = await response.json();
 
@@ -104,10 +104,10 @@ export default function Chat() {
     }
   };
 
-  // 2. Cargar los mensajes del chat activo
+  // 2. Cargar los mensajes del chat activo (Backend Render)
   const obtenerMensajes = async () => {
     try {
-      const response = await fetch(`http://localhost:4000/api/chat/${chatActivo.id}/mensajes`);
+      const response = await fetch(`https://positivo-s.onrender.com/api/chat/${chatActivo.id}/mensajes`);
       if (response.ok) {
         const data = await response.json();
         setMensajes(data);
@@ -151,7 +151,7 @@ export default function Chat() {
     if (isMobile) setSidebarOpen(false);
   };
 
-  // 4. Enviar Mensaje con Firma Completa
+  // 4. Enviar Mensaje con Firma Completa (Backend Render)
   const enviarMensaje = async (e) => {
     e.preventDefault();
     if (!textoMensaje.trim() && !archivoAdjunto) return;
@@ -171,7 +171,7 @@ export default function Chat() {
     }
 
     try {
-      const response = await fetch('http://localhost:4000/api/chat/enviar', {
+      const response = await fetch('https://positivo-s.onrender.com/api/chat/enviar', {
         method: 'POST',
         body: formData,
       });
@@ -422,14 +422,14 @@ export default function Chat() {
                       <div style={{ marginTop: '8px' }}>
                         {msg.archivo.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
                           <img
-                            src={`http://localhost:4000/uploads/${msg.archivo}`}
+                            src={`https://positivo-s.onrender.com/uploads/${msg.archivo}`}
                             alt="Imagen Adjunta"
                             style={styles.imageAttachment}
-                            onClick={() => window.open(`http://localhost:4000/uploads/${msg.archivo}`, '_blank')}
+                            onClick={() => window.open(`https://positivo-s.onrender.com/uploads/${msg.archivo}`, '_blank')}
                           />
                         ) : (
                           <a
-                            href={`http://localhost:4000/uploads/${msg.archivo}`}
+                            href={`https://positivo-s.onrender.com/uploads/${msg.archivo}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             style={styles.fileAttachmentBtn}

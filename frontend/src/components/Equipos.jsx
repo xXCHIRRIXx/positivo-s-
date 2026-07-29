@@ -1,8 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { auth } from '../auth/firebase.config';
 import { onAuthStateChanged } from 'firebase/auth';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
+const initialFormState = {
+  serial: '',
+  tipoPropiedad: 'Propio',
+  proveedor: '',
+  modelo: '',
+  descripcion: '',
+  estadoFisico: 'Bueno',
+  disponibilidad: 'Disponible',
+  ciudad: 'Bogotá',
+  asignadoA: '',
+  identificacionUsuario: '',
+  usuarioRegistro: ''
+};
 
 export default function Equipos() {
   const navigate = useNavigate();
@@ -18,19 +34,7 @@ export default function Equipos() {
   const [emailUsuario, setEmailUsuario] = useState('');
   const [uidUsuario, setUidUsuario] = useState('');
 
-  const [formData, setFormData] = useState({
-    serial: '',
-    tipoPropiedad: 'Propio',
-    proveedor: '',
-    modelo: '',
-    descripcion: '',
-    estadoFisico: 'Bueno',
-    disponibilidad: 'Disponible',
-    ciudad: 'Bogotá',
-    asignadoA: '',
-    identificacionUsuario: '',
-    usuarioRegistro: ''
-  });
+  const [formData, setFormData] = useState(initialFormState);
 
   useEffect(() => {
     cargarEquipos();
@@ -45,7 +49,7 @@ export default function Equipos() {
 
   const cargarEquipos = async () => {
     try {
-      const response = await fetch('http://localhost:4000/api/equipos');
+      const response = await fetch(`${API_URL}/api/equipos`);
       const data = await response.json();
       if (response.ok) setEquipos(data);
     } catch (err) {
@@ -79,19 +83,7 @@ export default function Equipos() {
 
   const cancelarEdicion = () => {
     setEquipoEditando(null);
-    setFormData({
-      serial: '',
-      tipoPropiedad: 'Propio',
-      proveedor: '',
-      modelo: '',
-      descripcion: '',
-      estadoFisico: 'Bueno',
-      disponibilidad: 'Disponible',
-      ciudad: 'Bogotá',
-      asignadoA: '',
-      identificacionUsuario: '',
-      usuarioRegistro: ''
-    });
+    setFormData(initialFormState);
     setError('');
     setMensaje('');
   };
@@ -102,13 +94,10 @@ export default function Equipos() {
     setMensaje('');
 
     try {
-      let url = 'http://localhost:4000/api/equipos';
-      let method = 'POST';
-
-      if (equipoEditando) {
-        url = `http://localhost:4000/api/equipos/${equipoEditando}`;
-        method = 'PUT';
-      }
+      const url = equipoEditando 
+        ? `${API_URL}/api/equipos/${equipoEditando}` 
+        : `${API_URL}/api/equipos`;
+      const method = equipoEditando ? 'PUT' : 'POST';
 
       const asignadoVal = formData.disponibilidad === 'Asignado' ? formData.asignadoA : '';
       const idVal = formData.disponibilidad === 'Asignado' ? formData.identificacionUsuario : '';
@@ -121,15 +110,13 @@ export default function Equipos() {
         asignado_a: asignadoVal,
         identificacion_usuario: idVal,
         registradoPor: formData.usuarioRegistro,
-        emailUsuario: emailUsuario,
-        uidUsuario: uidUsuario,
-        ...(equipoEditando 
-          ? { fechaActualizacion: fechaActual } 
-          : { fechaRegistro: fechaActual })
+        emailUsuario,
+        uidUsuario,
+        ...(equipoEditando ? { fechaActualizacion: fechaActual } : { fechaRegistro: fechaActual })
       };
 
       const response = await fetch(url, {
-        method: method,
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(datosAEnviar)
       });
@@ -138,7 +125,6 @@ export default function Equipos() {
       if (!response.ok) throw new Error(data.error || 'Error al guardar el equipo');
 
       setMensaje(equipoEditando ? '¡Equipo actualizado exitosamente!' : '¡Equipo registrado exitosamente!');
-      
       cancelarEdicion();
       cargarEquipos();
     } catch (err) {
@@ -155,7 +141,7 @@ export default function Equipos() {
     if (!window.confirm('¿Estás seguro de eliminar este equipo del inventario?')) return;
 
     try {
-      const response = await fetch(`http://localhost:4000/api/equipos/${id}`, {
+      const response = await fetch(`${API_URL}/api/equipos/${id}`, {
         method: 'DELETE'
       });
       if (response.ok) {
@@ -166,23 +152,26 @@ export default function Equipos() {
     }
   };
 
-  const equiposFiltrados = equipos.filter(eq => {
-    const asignadoTexto = eq.asignadoA || eq.asignado_a || '';
-    const idTexto = eq.identificacionUsuario || eq.identificacion_usuario || '';
-    const responsableTexto = eq.usuarioRegistro || eq.registradoPor || '';
+  const equiposFiltrados = useMemo(() => {
+    return equipos.filter(eq => {
+      const asignadoTexto = eq.asignadoA || eq.asignado_a || '';
+      const idTexto = eq.identificacionUsuario || eq.identificacion_usuario || '';
+      const responsableTexto = eq.usuarioRegistro || eq.registradoPor || '';
+      const query = busqueda.toLowerCase();
 
-    const cumpleBusqueda = 
-      (eq.serial && eq.serial.toLowerCase().includes(busqueda.toLowerCase())) ||
-      (eq.modelo && eq.modelo.toLowerCase().includes(busqueda.toLowerCase())) ||
-      (asignadoTexto.toLowerCase().includes(busqueda.toLowerCase())) ||
-      (idTexto.toLowerCase().includes(busqueda.toLowerCase())) ||
-      (responsableTexto.toLowerCase().includes(busqueda.toLowerCase()));
+      const cumpleBusqueda = 
+        (eq.serial && eq.serial.toLowerCase().includes(query)) ||
+        (eq.modelo && eq.modelo.toLowerCase().includes(query)) ||
+        (asignadoTexto.toLowerCase().includes(query)) ||
+        (idTexto.toLowerCase().includes(query)) ||
+        (responsableTexto.toLowerCase().includes(query));
 
-    if (filtroTipo === 'Todos') return cumpleBusqueda;
-    if (filtroTipo === 'Propios') return cumpleBusqueda && eq.tipoPropiedad === 'Propio';
-    if (filtroTipo === 'Proveedores') return cumpleBusqueda && eq.tipoPropiedad === 'Proveedor';
-    return cumpleBusqueda;
-  });
+      if (filtroTipo === 'Todos') return cumpleBusqueda;
+      if (filtroTipo === 'Propios') return cumpleBusqueda && eq.tipoPropiedad === 'Propio';
+      if (filtroTipo === 'Proveedores') return cumpleBusqueda && eq.tipoPropiedad === 'Proveedor';
+      return cumpleBusqueda;
+    });
+  }, [equipos, busqueda, filtroTipo]);
 
   const exportarAExcel = () => {
     if (equiposFiltrados.length === 0) {

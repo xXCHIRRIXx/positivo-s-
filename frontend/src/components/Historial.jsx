@@ -32,7 +32,8 @@ export default function AuditoriaDashboard() {
     };
 
     const verificarYActualizar = () => {
-      if (cargandoUsuarios && cargandoEquipos && cargandoActas) return;
+      // CORRECCIÓN: Se cambió de && a || para asegurar que espere a que terminen de cargar todas las colecciones
+      if (cargandoUsuarios || cargandoEquipos || cargandoActas) return;
 
       const resolverResponsable = (data) => {
         const posiblesReferencias = [
@@ -159,12 +160,13 @@ export default function AuditoriaDashboard() {
       verificarYActualizar();
     };
 
-    const unsubUsuarios = onSnapshot(collection(db, 'usuarios'), procesarSnapshotUsuarios, () => {
+    const handleErrorUsuarios = () => {
       cargandoUsuarios = false;
       verificarYActualizar();
-    });
-    
-    const unsubUsers = onSnapshot(collection(db, 'users'), procesarSnapshotUsuarios, () => {});
+    };
+
+    const unsubUsuarios = onSnapshot(collection(db, 'usuarios'), procesarSnapshotUsuarios, handleErrorUsuarios);
+    const unsubUsers = onSnapshot(collection(db, 'users'), procesarSnapshotUsuarios, handleErrorUsuarios);
 
     const unsubEquipos = onSnapshot(collection(db, 'equipos'), (snapshot) => {
       equiposDocs = snapshot.docs;

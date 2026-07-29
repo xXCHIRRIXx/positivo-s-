@@ -12,7 +12,7 @@ export default function Dashboard() {
     }
     // Si la ruta es relativa del backend (ej: /uploads/... o uploads/...)
     const rutaLimpiada = foto.startsWith('/') ? foto : `/${foto}`;
-    return `http://localhost:4000${rutaLimpiada}`;
+    return `https://positivo-s.onrender.com${rutaLimpiada}`;
   };
 
   // Obtener la sesión activa desde localStorage
@@ -50,8 +50,8 @@ export default function Dashboard() {
     setCargando(true);
     try {
       const [resEquipos, resActas] = await Promise.all([
-        fetch('http://localhost:4000/api/equipos').catch(() => null),
-        fetch('http://localhost:4000/api/actas').catch(() => null)
+        fetch('https://positivo-s.onrender.com/api/equipos').catch(() => null),
+        fetch('https://positivo-s.onrender.com/api/actas').catch(() => null)
       ]);
 
       if (resEquipos && resEquipos.ok) {
@@ -69,7 +69,7 @@ export default function Dashboard() {
 
   const sincronizarPerfilDesdeBackend = async () => {
     try {
-      const res = await fetch('http://localhost:4000/api/usuarios');
+      const res = await fetch('https://positivo-s.onrender.com/api/usuarios');
       if (res.ok) {
         const usuarios = await res.json();
         const miUsuarioEnBD = usuarios.find(u => u.email?.toLowerCase() === miEmail?.toLowerCase());
@@ -136,7 +136,7 @@ export default function Dashboard() {
       }
 
       // Apuntamos a la ruta general /api/usuarios/actualizar para evitar fallos de parámetros con el email en la URL
-      const response = await fetch(`http://localhost:4000/api/usuarios/actualizar`, {
+      const response = await fetch(`https://positivo-s.onrender.com/api/usuarios/actualizar`, {
         method: 'POST',
         body: formData
       });
@@ -591,7 +591,7 @@ export default function Dashboard() {
                 </label>
                 <input
                   type="url"
-                  value={formPerfil.foto.startsWith('data:') || formPerfil.foto.startsWith('http://localhost') ? '' : formPerfil.foto}
+                  value={formPerfil.foto.startsWith('data:') || formPerfil.foto.startsWith('https://positivo-s.onrender.com') || formPerfil.foto.startsWith('http://localhost') ? '' : formPerfil.foto}
                   onChange={(e) => {
                     setArchivoFoto(null); // Limpiamos archivo si escribe URL manual
                     setFormPerfil({ ...formPerfil, foto: e.target.value });
@@ -633,14 +633,14 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={() => setIsProfileOpen(false)}
-                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-all"
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-sm transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={guardandoPerfil}
-                  className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {guardandoPerfil ? 'Guardando...' : 'Guardar Cambios'}
                 </button>

@@ -114,7 +114,7 @@ export default function Actas() {
     };
 
     try {
-      const response = await fetch('http://localhost:4000/api/actas', {
+      const response = await fetch('https://positivo-s.onrender.com/api/actas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payloadActa)
@@ -345,7 +345,6 @@ export default function Actas() {
                   <option value="Periférico">GUAYA</option>
                   <option value="Almacenamiento">MALETA</option>
                   <option value="Otro">OTRO</option>
-
                 </select>
               </div>
 
