@@ -227,10 +227,9 @@ export default function Actas() {
                   className="w-full px-3 py-2 bg-slate-900 border border-cyan-500/50 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-400"
                 >
                   <option value="" disabled>-- Seleccione un responsable --</option>
-                  <option value="JUAN PABLO">JUAN PABLO</option>
-                  <option value="JUAN CASTRO">JUAN CASTRO</option>
-                  <option value="ANDRES CASTRO">ANDRES CASTRO</option>
-                  <option value="ESTEFANIA ROCHA">ESTEFANIA ROCHA</option>
+                  <option value="JUAN CASTRO">JUAN DAVID CASTRO</option>
+                  <option value="ANDRES CASTRO">ANDRES FELIPE CASTRO</option>
+                  <option value="ESTEFANIA ROCHA">ESTEFANIA GALARZA ROCHA</option>
                 </select>
               </div>
               <div>

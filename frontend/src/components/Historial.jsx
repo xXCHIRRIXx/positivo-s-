@@ -12,6 +12,7 @@ export default function AuditoriaDashboard() {
   const [filtroFecha, setFiltroFecha] = useState('');
   const [logs, setLogs] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [equipoModal, setEquipoModal] = useState(null); // Estado para controlar el modal de equipos
 
   useEffect(() => {
     let usuariosMap = {}; 
@@ -92,7 +93,8 @@ export default function AuditoriaDashboard() {
           modulo: 'Inventario',
           accion: 'Registro de Equipo',
           detalle: `Equipo: ${data.tipo || data.marca || data.modelo || 'Dispositivo'} (Serial: ${data.serial || data.serialEquipo || 'N/A'})`,
-          pdfUrl: null
+          pdfUrl: null,
+          datosEquipo: data // Guardamos la data completa del equipo para mostrarla en el modal
         };
       });
 
@@ -133,7 +135,8 @@ export default function AuditoriaDashboard() {
           modulo: 'Actas',
           accion: data.tipoActa || 'Generación de Acta',
           detalle: `Acta para colaborador: ${colaboradorNombre}`,
-          pdfUrl: pdfUrlFinal
+          pdfUrl: pdfUrlFinal,
+          datosEquipo: null
         };
       });
 
@@ -232,12 +235,12 @@ export default function AuditoriaDashboard() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white p-6 md:p-10">
+    <div className="min-h-screen bg-slate-900 text-white p-6 md:p-10 relative">
       
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-indigo-400">Historial / Trazabilidad</h1>
-          <p className="text-slate-400 text-sm mt-1">Registro en tiempo real de equipos ingresados y actas generadas por sede. Haz clic en un registro de acta para visualizar su PDF.</p>
+          <p className="text-slate-400 text-sm mt-1">Registro en tiempo real de equipos ingresados y actas generadas por sede. Haz clic en un registro de acta para visualizar su PDF o en los detalles del equipo.</p>
         </div>
         <button 
           onClick={() => navigate('/dashboard')}
@@ -315,7 +318,7 @@ export default function AuditoriaDashboard() {
                   <th className="px-4 py-3">Sede</th>
                   <th className="px-4 py-3">Acción</th>
                   <th className="px-4 py-3">Detalle del Registro</th>
-                  <th className="px-4 py-3 text-center">Acciones PDF</th>
+                  <th className="px-4 py-3 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700">
@@ -360,6 +363,14 @@ export default function AuditoriaDashboard() {
                         >
                           📄 Ver PDF
                         </button>
+                      ) : log.datosEquipo ? (
+                        <button
+                          onClick={() => setEquipoModal(log.datosEquipo)}
+                          className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-indigo-300 rounded-lg text-xs font-semibold shadow transition-all flex items-center gap-1 mx-auto border border-slate-600"
+                          title="Ver Detalle del Equipo"
+                        >
+                          🔍 Ver Detalle
+                        </button>
                       ) : (
                         <span className="text-xs text-slate-500 italic">No aplica</span>
                       )}
@@ -377,6 +388,88 @@ export default function AuditoriaDashboard() {
         )}
 
       </div>
+
+      {/* ================= MODAL DE DETALLE DE EQUIPO ================= */}
+      {equipoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-xl p-6 shadow-2xl text-white relative animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-700 mb-4">
+              <h3 className="text-lg font-bold text-indigo-400 flex items-center gap-2">
+                <span>💻</span> Detalle del Equipo Registrado
+              </h3>
+              <button 
+                onClick={() => setEquipoModal(null)}
+                className="text-slate-400 hover:text-white bg-slate-900/50 hover:bg-slate-900 p-1.5 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-6 max-h-[60vh] overflow-y-auto pr-1">
+              <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                <span className="block text-xs font-semibold text-slate-400 uppercase">Serial</span>
+                <span className="font-mono text-indigo-300 font-medium">{equipoModal.serial || equipoModal.serialEquipo || 'N/A'}</span>
+              </div>
+              <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                <span className="block text-xs font-semibold text-slate-400 uppercase">Modelo / Marca / Tipo</span>
+                <span className="font-medium">{equipoModal.modelo || equipoModal.marca || equipoModal.tipo || 'N/A'}</span>
+              </div>
+              <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                <span className="block text-xs font-semibold text-slate-400 uppercase">Tipo de Propiedad</span>
+                <span className="font-medium">{equipoModal.tipoPropiedad || 'Propio'}</span>
+              </div>
+              <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                <span className="block text-xs font-semibold text-slate-400 uppercase">Proveedor</span>
+                <span className="font-medium">{equipoModal.proveedor || 'N/A'}</span>
+              </div>
+              <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                <span className="block text-xs font-semibold text-slate-400 uppercase">Estado Físico</span>
+                <span className="font-medium">{equipoModal.estadoFisico || 'Bueno'}</span>
+              </div>
+              <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                <span className="block text-xs font-semibold text-slate-400 uppercase">Disponibilidad</span>
+                <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold mt-1 ${
+                  equipoModal.disponibilidad === 'Asignado' ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'
+                }`}>
+                  {equipoModal.disponibilidad || 'Disponible'}
+                </span>
+              </div>
+              <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                <span className="block text-xs font-semibold text-slate-400 uppercase">Ciudad / Sede</span>
+                <span className="font-medium">{equipoModal.sede || equipoModal.ciudad || 'Bogotá'}</span>
+              </div>
+              <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                <span className="block text-xs font-semibold text-slate-400 uppercase">Registrado Por</span>
+                <span className="font-medium">{equipoModal.usuarioRegistro || 'Desconocido'}</span>
+              </div>
+              {equipoModal.asignadoA && (
+                <div className="md:col-span-2 bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                  <span className="block text-xs font-semibold text-slate-400 uppercase">Asignado a Colaborador</span>
+                  <span className="font-medium text-emerald-300">
+                    {equipoModal.asignadoA} {equipoModal.identificacionUsuario ? `(ID: ${equipoModal.identificacionUsuario})` : ''}
+                  </span>
+                </div>
+              )}
+              {equipoModal.descripcion && (
+                <div className="md:col-span-2 bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                  <span className="block text-xs font-semibold text-slate-400 uppercase">Descripción / Observaciones</span>
+                  <span className="text-slate-300 text-xs">{equipoModal.descripcion}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-slate-700">
+              <button
+                onClick={() => setEquipoModal(null)}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold shadow transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
