@@ -22,7 +22,7 @@ const PORT = process.env.PORT || 4000;
 // MIDDLEWARES GLOBALES
 // ==========================================
 app.use(cors({
-    origin: '*', // O puedes restringirlo a tu GitHub Pages / dominio de producción
+    origin: '*', 
     credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -69,7 +69,7 @@ app.use('/uploads', express.static(uploadDir));
 // ==========================================
 // RUTAS DE PRUEBA Y AUTENTICACIÓN
 // ==========================================
-app.get('/', (req, res) => {
+app.get('/api', (req, res) => {
     res.json({ mensaje: '¡API de Inventario Positivo funcionando correctamente!' });
 });
 
@@ -478,14 +478,11 @@ if (fs.existsSync(path.join(__dirname, 'routes', 'auth.routes.js')) || fs.exists
 // ==========================================
 // CONFIGURACIÓN PARA SERVIR EL FRONTEND EN PRODUCCIÓN
 // ==========================================
-const frontendDistPath = path.join(__dirname, '../frontend/dist');
+const frontendDistPath = path.join(__dirname, 'frontend', 'dist');
 
 if (fs.existsSync(frontendDistPath)) {
     app.use(express.static(frontendDistPath));
     
-    app.use(express.static(frontendDistPath));
-    
-    // CORRECCIÓN APLICADA AQUÍ (Uso de expresión regular compatible con Express 5)
     app.get(/(.*)/, (req, res, next) => {
         if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
             return next();
