@@ -185,8 +185,8 @@ export default function Actas() {
                 }}
                 className="w-full px-4 py-2.5 bg-slate-900 border border-cyan-500/50 rounded-xl text-white text-sm focus:outline-none focus:border-cyan-400"
               >
-                <option value="Asignación">Acta de Asignación</option>
-                <option value="Devolución">Acta de Devolución</option>
+                <option value="Asignación">ACTA DE ASIGNACIÓN</option>
+                <option value="Devolución">ACTA DE DEVOLUCIÓN</option>
               </select>
             </div>
 
@@ -197,9 +197,8 @@ export default function Actas() {
                 onChange={(e) => setSede(e.target.value)}
                 className="w-full px-4 py-2.5 bg-slate-900 border border-cyan-500/50 rounded-xl text-white text-sm focus:outline-none focus:border-cyan-400"
               >
-                <option value="Bogotá">Bogotá</option>
-                <option value="Medellín">Medellín</option>
-                <option value="Remoto">Remoto</option>
+                <option value="Bogotá">BOGOTA</option>
+                <option value="Medellín">MEDELLÍN</option>
               </select>
             </div>
 
@@ -329,12 +328,24 @@ export default function Actas() {
                   onChange={(e) => setTipoElemento(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500"
                 >
-                  <option value="Computador">Computador</option>
-                  <option value="Celular">Celular</option>
-                  <option value="Herramienta">Herramienta</option>
-                  <option value="Periférico">Periférico</option>
-                  <option value="Almacenamiento">Almacenamiento</option>
-                  <option value="Otro">Otro</option>
+                  <option value="Computador">LAPTOP POSITIVOS</option>
+                  <option value="Celular">CELULAR</option>
+                  <option value="Herramienta">LINEA TELEFÓNICA</option>
+                  <option value="Periférico">TECLADO</option>
+                  <option value="Almacenamiento">MOUSE</option>
+                  <option value="Otro">DIADEMA</option>
+                  <option value="Periférico">BASE REFRIGERANTE</option>
+                  <option value="Almacenamiento">PANTALLA</option>
+                  <option value="Otro">MULTIPUERTO</option>
+                  <option value="Otro">CABLE UTP</option>
+                  <option value="Otro">CABLE HDMI</option>
+                  <option value="Periférico">DESTORNILLADORES</option>
+                  <option value="Almacenamiento">DISCO SÓLIDO</option>
+                  <option value="Otro">DISCO MECÁNICO</option>
+                  <option value="Periférico">GUAYA</option>
+                  <option value="Almacenamiento">MALETA</option>
+                  <option value="Otro">OTRO</option>
+
                 </select>
               </div>
 
@@ -367,9 +378,9 @@ export default function Actas() {
                   onChange={(e) => setEstadoFisicoItem(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500"
                 >
-                  <option value="Bueno">Bueno</option>
-                  <option value="Con falla">Con falla</option>
-                  <option value="Dañado">Dañado</option>
+                  <option value="Bueno">BUENO</option>
+                  <option value="Con falla">CON FALLA</option>
+                  <option value="Dañado">DAÑADO</option>
                 </select>
               </div>
 
