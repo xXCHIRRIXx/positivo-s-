@@ -297,7 +297,7 @@ app.delete('/api/equipos/:id', async (req, res) => {
 });
 
 // ==========================================
-// RUTAS DE GESTIÓN DE ACTAS (CON PUPPETEER)
+// RUTAS DE GESTIÓN DE ACTAS
 // ==========================================
 app.post('/api/actas', async (req, res) => {
     try {
@@ -478,7 +478,7 @@ if (fs.existsSync(path.join(__dirname, 'routes', 'auth.routes.js')) || fs.exists
 // ==========================================
 // CONFIGURACIÓN PARA SERVIR EL FRONTEND EN PRODUCCIÓN
 // ==========================================
-const frontendDistPath = path.join(__dirname, 'frontend', 'dist');
+const frontendDistPath = path.join(__dirname, '../frontend/dist');
 
 if (fs.existsSync(frontendDistPath)) {
     app.use(express.static(frontendDistPath));
