@@ -10,12 +10,21 @@ const { db } = require('./auth/firebase.config');
 const generarActaPDF = require('./helpers/pdfGenerator');
 
 const app = express();
+
+// ==========================================
+// CONFIGURACIÓN PARA PRODUCCIÓN (RENDER / PROXIES)
+// ==========================================
+app.set('trust proxy', 1);
+
 const PORT = process.env.PORT || 4000;
 
 // ==========================================
 // MIDDLEWARES GLOBALES
 // ==========================================
-app.use(cors());
+app.use(cors({
+    origin: '*', // O puedes restringirlo a tu GitHub Pages: ['https://xXCHIRRIXx.github.io']
+    credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
@@ -110,7 +119,8 @@ const actualizarUsuarioHandler = async (req, res) => {
         let fotoFinal = req.body.foto;
 
         if (req.file) {
-            fotoFinal = `http://localhost:${PORT}/uploads/${req.file.filename}`;
+            const baseUrl = `${req.protocol}://${req.get('host')}`;
+            fotoFinal = `${baseUrl}/uploads/${req.file.filename}`;
         }
 
         const usuariosRef = db.collection('usuarios');
@@ -297,7 +307,6 @@ app.post('/api/actas', async (req, res) => {
             return res.status(400).json({ error: 'Debe incluir al menos un equipo en el acta.' });
         }
 
-        // 1. Ejecutar la generación del PDF con Puppeteer primero para obtener el nombre del archivo
         const pdfResult = await generarActaPDF(datosActa);
         let nombreArchivo = null;
         if (typeof pdfResult === 'string') {
@@ -324,14 +333,12 @@ app.post('/api/actas', async (req, res) => {
             equipos: datosActa.equipos,
             nombreResponsable: responsableFinal,
             identificacionResponsable: datosActa.identificacionResponsable || 'N/A',
-            nombreArchivo: nombreArchivo, // Guardamos la referencia para el historial/visualización
+            nombreArchivo: nombreArchivo,
             fechaCreacion: new Date().toISOString()
         };
 
-        // 2. Guardar registro general en la colección 'actas' de Firestore con el nombreArchivo incluido
         const docRef = await db.collection('actas').add(nuevaActa);
 
-        // 3. ACTUALIZAR CADA EQUIPO INVOLUCRADO EN FIRESTORE (Vincular acta y estado)
         const tipoActaLower = (datosActa.tipoActa || 'Asignación').toLowerCase();
         const esDevolucion = tipoActaLower.includes('devolución') || tipoActaLower.includes('devolucion');
 
@@ -365,11 +372,9 @@ app.post('/api/actas', async (req, res) => {
             }
         }
 
-        // 4. Construir la URL pública
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const pdfUrl = `${baseUrl}/uploads/${nombreArchivo}`;
 
-        // 5. Responder al cliente
         res.status(201).json({ 
             message: 'Acta generada, PDF creado y equipos actualizados con éxito', 
             id: docRef.id, 
@@ -447,13 +452,15 @@ app.get('/api/chat/:chatId/mensajes', async (req, res) => {
 app.post('/api/chat/enviar', uploadFlexible('archivo'), async (req, res) => {
     try {
         const { chatId, remitenteEmail, remitenteNombre, remitenteCargo, fechaHora, texto } = req.body;
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+
         const nuevoMensaje = {
             chatId: chatId || 'general',
             remitenteEmail: remitenteEmail || 'usuario@positivo.com',
             remitenteNombre: remitenteNombre || 'Usuario',
             remitenteCargo: remitenteCargo || 'Asociado',
             texto: texto || '',
-            archivo: req.file ? `http://localhost:${PORT}/uploads/${req.file.filename}` : null,
+            archivo: req.file ? `${baseUrl}/uploads/${req.file.filename}` : null,
             fechaHora: fechaHora || new Date().toISOString()
         };
         const docRef = await db.collection('mensajes').add(nuevoMensaje);
@@ -489,5 +496,5 @@ app.use((req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
