@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import { auth } from '../auth/firebase.config';
 import { onAuthStateChanged } from 'firebase/auth';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const initialFormState = {
   serial: '',
