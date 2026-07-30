@@ -6,7 +6,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const verifyToken = require('./auth/auth.middleware');
-const { db } = require('./auth/firebase.config');
+const { db } = require('./auth/firebase.config'); // Quitamos 'storage' ya que no se usará
 const generarActaPDF = require('./helpers/pdfGenerator');
 
 const app = express();
@@ -36,7 +36,7 @@ if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-const storage = multer.diskStorage({
+const multerStorage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, uploadDir);
     },
@@ -47,7 +47,7 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ 
-    storage: storage,
+    storage: multerStorage,
     limits: { fileSize: 10 * 1024 * 1024 }
 });
 
@@ -64,6 +64,7 @@ const uploadFlexible = (fieldName) => {
     };
 };
 
+// IMPORTANTE: Servir archivos estáticos antes de las rutas del frontend o comodines
 app.use('/uploads', express.static(uploadDir));
 
 // ==========================================
@@ -297,7 +298,7 @@ app.delete('/api/equipos/:id', async (req, res) => {
 });
 
 // ==========================================
-// RUTAS DE GESTIÓN DE ACTAS
+// RUTAS DE GESTIÓN DE ACTAS (Modificadas con Base64 en Firestore)
 // ==========================================
 app.post('/api/actas', async (req, res) => {
     try {
@@ -307,16 +308,36 @@ app.post('/api/actas', async (req, res) => {
             return res.status(400).json({ error: 'Debe incluir al menos un equipo en el acta.' });
         }
 
+        // 1. Generar el PDF de forma local temporal
         const pdfResult = await generarActaPDF(datosActa);
+        let rutaLocal = null;
         let nombreArchivo = null;
+
         if (typeof pdfResult === 'string') {
+            rutaLocal = pdfResult;
             nombreArchivo = path.basename(pdfResult);
         } else if (pdfResult && typeof pdfResult === 'object') {
-            nombreArchivo = pdfResult.nombreArchivo || pdfResult.filename || pdfResult.file || pdfResult.name;
+            rutaLocal = pdfResult.filePath || pdfResult.path;
+            nombreArchivo = pdfResult.nombreArchivo || pdfResult.filename || path.basename(rutaLocal);
         }
 
         if (!nombreArchivo) {
             nombreArchivo = `acta_${Date.now()}.pdf`;
+        }
+        if (!rutaLocal) {
+            rutaLocal = path.join(uploadDir, nombreArchivo);
+        }
+
+        // 2. Leer el archivo y pasarlo a Base64
+        let pdfBase64 = null;
+        if (fs.existsSync(rutaLocal)) {
+            const pdfBuffer = fs.readFileSync(rutaLocal);
+            pdfBase64 = `data:application/pdf;base64,${pdfBuffer.toString('base64')}`;
+            
+            // Borrar el archivo local inmediatamente
+            fs.unlinkSync(rutaLocal);
+        } else {
+            return res.status(500).json({ error: 'No se pudo encontrar el archivo PDF generado.' });
         }
 
         const responsableFinal = datosActa.nombreResponsable || datosActa.usuarioRegistro || 'Soporte Técnico Positivo';
@@ -334,6 +355,7 @@ app.post('/api/actas', async (req, res) => {
             nombreResponsable: responsableFinal,
             identificacionResponsable: datosActa.identificacionResponsable || 'N/A',
             nombreArchivo: nombreArchivo,
+            pdfUrl: pdfBase64, // Guardamos el Base64 directamente
             fechaCreacion: new Date().toISOString()
         };
 
@@ -372,13 +394,10 @@ app.post('/api/actas', async (req, res) => {
             }
         }
 
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        const pdfUrl = `${baseUrl}/uploads/${nombreArchivo}`;
-
         res.status(201).json({ 
-            message: 'Acta generada, PDF creado y equipos actualizados con éxito', 
+            message: 'Acta generada y guardada en base de datos con éxito', 
             id: docRef.id, 
-            pdfUrl: pdfUrl,
+            pdfUrl: pdfBase64,
             nombreArchivo: nombreArchivo,
             ...nuevaActa 
         });
@@ -391,16 +410,10 @@ app.post('/api/actas', async (req, res) => {
 app.get('/api/actas', async (req, res) => {
     try {
         const snapshot = await db.collection('actas').get();
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        
-        const actas = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                pdfUrl: data.nombreArchivo ? `${baseUrl}/uploads/${data.nombreArchivo}` : null
-            };
-        });
+        const actas = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
         res.status(200).json(actas);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -414,13 +427,9 @@ app.get('/api/actas/:id', async (req, res) => {
         if (!docSnap.exists) {
             return res.status(404).json({ error: 'El acta no existe en la base de datos.' });
         }
-        const data = docSnap.data();
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-
         res.status(200).json({ 
             id: docSnap.id, 
-            ...data,
-            pdfUrl: data.nombreArchivo ? `${baseUrl}/uploads/${data.nombreArchivo}` : null
+            ...docSnap.data() 
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -484,6 +493,7 @@ if (fs.existsSync(frontendDistPath)) {
     app.use(express.static(frontendDistPath));
     
     app.get(/(.*)/, (req, res, next) => {
+        // Excluir explícitamente tanto /api como /uploads de ser interceptados por el frontend
         if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
             return next();
         }
@@ -498,7 +508,7 @@ app.use((err, req, res, next) => {
     console.error("Error crítico capturado en servidor:", err);
     if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
-            return res.status(0).json({ error: 'El archivo adjunto supera el límite máximo permitido de 10MB.' });
+            return res.status(400).json({ error: 'El archivo adjunto supera el límite máximo permitido de 10MB.' });
         }
         return res.status(400).json({ error: `Error en la subida del archivo: ${err.message}` });
     } else if (err) {
