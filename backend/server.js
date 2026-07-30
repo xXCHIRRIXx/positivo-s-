@@ -6,7 +6,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const verifyToken = require('./auth/auth.middleware');
-const { db } = require('./auth/firebase.config'); // Quitamos 'storage' ya que no se usará
+const { db } = require('./auth/firebase.config');
 const generarActaPDF = require('./helpers/pdfGenerator');
 
 const app = express();
@@ -64,7 +64,7 @@ const uploadFlexible = (fieldName) => {
     };
 };
 
-// IMPORTANTE: Servir archivos estáticos antes de las rutas del frontend o comodines
+// IMPORTANTE: Servir archivos estáticos antes de las rutas del frontend
 app.use('/uploads', express.static(uploadDir));
 
 // ==========================================
@@ -298,7 +298,7 @@ app.delete('/api/equipos/:id', async (req, res) => {
 });
 
 // ==========================================
-// RUTAS DE GESTIÓN DE ACTAS (Modificadas con Base64 en Firestore)
+// RUTAS DE GESTIÓN DE ACTAS
 // ==========================================
 app.post('/api/actas', async (req, res) => {
     try {
@@ -308,7 +308,6 @@ app.post('/api/actas', async (req, res) => {
             return res.status(400).json({ error: 'Debe incluir al menos un equipo en el acta.' });
         }
 
-        // 1. Generar el PDF de forma local temporal
         const pdfResult = await generarActaPDF(datosActa);
         let rutaLocal = null;
         let nombreArchivo = null;
@@ -328,13 +327,10 @@ app.post('/api/actas', async (req, res) => {
             rutaLocal = path.join(uploadDir, nombreArchivo);
         }
 
-        // 2. Leer el archivo y pasarlo a Base64
         let pdfBase64 = null;
         if (fs.existsSync(rutaLocal)) {
             const pdfBuffer = fs.readFileSync(rutaLocal);
             pdfBase64 = `data:application/pdf;base64,${pdfBuffer.toString('base64')}`;
-            
-            // Borrar el archivo local inmediatamente
             fs.unlinkSync(rutaLocal);
         } else {
             return res.status(500).json({ error: 'No se pudo encontrar el archivo PDF generado.' });
@@ -355,7 +351,7 @@ app.post('/api/actas', async (req, res) => {
             nombreResponsable: responsableFinal,
             identificacionResponsable: datosActa.identificacionResponsable || 'N/A',
             nombreArchivo: nombreArchivo,
-            pdfUrl: pdfBase64, // Guardamos el Base64 directamente
+            pdfUrl: pdfBase64,
             fechaCreacion: new Date().toISOString()
         };
 
@@ -493,7 +489,6 @@ if (fs.existsSync(frontendDistPath)) {
     app.use(express.static(frontendDistPath));
     
     app.get(/(.*)/, (req, res, next) => {
-        // Excluir explícitamente tanto /api como /uploads de ser interceptados por el frontend
         if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
             return next();
         }
