@@ -121,15 +121,44 @@ export default function Actas() {
       });
 
       const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("El servidor no devolvió una respuesta JSON válida.");
+
+      if (!response.ok) {
+        let errorMessage = 'Error al generar el acta';
+        if (contentType && contentType.includes("application/json")) {
+          const errData = await response.json();
+          errorMessage = errData.error || errorMessage;
+        } else {
+          errorMessage = await response.text();
+        }
+        throw new Error(errorMessage);
       }
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Error al generar el acta');
-
-      if (data.pdfUrl) {
-        window.open(data.pdfUrl, '_blank');
+      // Manejo dinámico: si responde con PDF en binario o con JSON que contenga una URL
+      if (contentType && contentType.includes("application/pdf")) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Acta_${tipoActa}_${nombresColaborador.replace(/\s+/g, '_')}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else if (contentType && contentType.includes("application/json")) {
+        const data = await response.json();
+        if (data.pdfUrl) {
+          window.open(data.pdfUrl, '_blank');
+        }
+      } else {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Acta_${tipoActa}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
       }
 
       setMensaje(`¡Acta de ${tipoActa} generada y PDF descargado con éxito!`);
