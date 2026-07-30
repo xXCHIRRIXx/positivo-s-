@@ -32,6 +32,24 @@ function generarNombreArchivo(tipo, inputData) {
 }
 
 /**
+ * Función para cargar el logo de forma segura en Base64 desde la misma carpeta helpers
+ */
+function obtenerLogoBase64() {
+    const logoPath = path.join(__dirname, 'logo.png');
+    if (fs.existsSync(logoPath)) {
+        try {
+            const logoBuffer = fs.readFileSync(logoPath);
+            return `data:image/png;base64,${logoBuffer.toString('base64')}`;
+        } catch (error) {
+            console.error("Error al leer el logo.png:", error);
+        }
+    } else {
+        console.warn("Advertencia: No se encontró el archivo logo.png en la ruta:", logoPath);
+    }
+    return '';
+}
+
+/**
  * Función principal enrutadora que decide qué tipo de acta generar de forma robusta
  */
 async function generarActaPDF(inputData = {}) {
@@ -97,12 +115,7 @@ async function generarActaDevolucion(inputData = {}) {
              </tr>`;
     }
 
-    const logoPath = path.join(__dirname, 'logo.png');
-    let logoSrc = '';
-    if (fs.existsSync(logoPath)) {
-        const logoBuffer = fs.readFileSync(logoPath);
-        logoSrc = `data:image/png;base64,${logoBuffer.toString('base64')}`;
-    }
+    const logoSrc = obtenerLogoBase64();
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -382,7 +395,7 @@ async function generarActaDevolucion(inputData = {}) {
     });
 
     const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    await page.setContent(htmlContent, { waitUntil: ['load', 'domcontentloaded'] });
 
     const fileName = generarNombreArchivo('devolucion', inputData);
     const filePath = path.join(__dirname, '..', 'uploads', fileName);
@@ -455,12 +468,7 @@ async function generarActaAsignacion(inputData = {}) {
              </tr>`;
     }
 
-    const logoPath = path.join(__dirname, 'logo.png');
-    let logoSrc = '';
-    if (fs.existsSync(logoPath)) {
-        const logoBuffer = fs.readFileSync(logoPath);
-        logoSrc = `data:image/png;base64,${logoBuffer.toString('base64')}`;
-    }
+    const logoSrc = obtenerLogoBase64();
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -747,7 +755,7 @@ async function generarActaAsignacion(inputData = {}) {
     });
 
     const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    await page.setContent(htmlContent, { waitUntil: ['load', 'domcontentloaded'] });
 
     const fileName = generarNombreArchivo('asignacion', inputData);
     const filePath = path.join(__dirname, '..', 'uploads', fileName);
