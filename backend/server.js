@@ -327,14 +327,13 @@ app.post('/api/actas', async (req, res) => {
             rutaLocal = path.join(uploadDir, nombreArchivo);
         }
 
-        let pdfBase64 = null;
-        if (fs.existsSync(rutaLocal)) {
-            const pdfBuffer = fs.readFileSync(rutaLocal);
-            pdfBase64 = `data:application/pdf;base64,${pdfBuffer.toString('base64')}`;
-            fs.unlinkSync(rutaLocal);
-        } else {
+        if (!fs.existsSync(rutaLocal)) {
             return res.status(500).json({ error: 'No se pudo encontrar el archivo PDF generado.' });
         }
+
+        // URL pública accesible mediante express.static('/uploads')
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const pdfUrl = `${baseUrl}/uploads/${nombreArchivo}`;
 
         const responsableFinal = datosActa.nombreResponsable || datosActa.usuarioRegistro || 'Soporte Técnico Positivo';
 
@@ -351,7 +350,7 @@ app.post('/api/actas', async (req, res) => {
             nombreResponsable: responsableFinal,
             identificacionResponsable: datosActa.identificacionResponsable || 'N/A',
             nombreArchivo: nombreArchivo,
-            pdfUrl: pdfBase64,
+            pdfUrl: pdfUrl,
             fechaCreacion: new Date().toISOString()
         };
 
@@ -393,7 +392,7 @@ app.post('/api/actas', async (req, res) => {
         res.status(201).json({ 
             message: 'Acta generada y guardada en base de datos con éxito', 
             id: docRef.id, 
-            pdfUrl: pdfBase64,
+            pdfUrl: pdfUrl,
             nombreArchivo: nombreArchivo,
             ...nuevaActa 
         });
