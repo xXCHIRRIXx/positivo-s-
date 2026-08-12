@@ -31,9 +31,8 @@ export default function Dashboard() {
   const [formPerfil, setFormPerfil] = useState({
     nombre: miNombre,
     cargo: miCargo,
-    foto: localStorage.getItem('usuarioFoto') || '' // Guardamos la ruta original para el formulario
+    foto: localStorage.getItem('usuarioFoto') || '' // Guardamos la ruta o Base64 original para el formulario
   });
-  const [archivoFoto, setArchivoFoto] = useState(null); // Archivo real para FormData
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
 
   // Validar sesión al montar el componente
@@ -102,12 +101,10 @@ export default function Dashboard() {
     navigate('/');
   };
 
-  // ⚡ SELECCIÓN DE FOTO (Guarda el archivo y muestra vista previa inmediata)
+  // ⚡ SELECCIÓN DE FOTO (Convierte el archivo a Base64 inmediatamente para el preview y envío)
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    setArchivoFoto(file); // Guardamos el archivo para enviarlo por FormData
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -116,29 +113,23 @@ export default function Dashboard() {
     reader.readAsDataURL(file);
   };
 
-  // ⚡ Actualización real enviando FormData al Backend (CORREGIDO)
+  // ⚡ Actualización enviando JSON con la cadena Base64 al Backend
   const handleGuardarPerfil = async (e) => {
     e.preventDefault();
     setGuardandoPerfil(true);
 
     try {
-      const formData = new FormData();
-      formData.append('email', miEmail); // Añadido explícitamente para el backend
-      formData.append('nombre', formPerfil.nombre);
-      formData.append('cargo', formPerfil.cargo);
-      
-      // Si seleccionó un archivo de su PC, lo adjuntamos para Multer
-      if (archivoFoto) {
-        formData.append('foto', archivoFoto);
-      } else {
-        // Si es una URL de texto o mantiene la actual
-        formData.append('foto', formPerfil.foto);
-      }
-
-      // Apuntamos a la ruta general /api/usuarios/actualizar para evitar fallos de parámetros con el email en la URL
       const response = await fetch(`http://localhost:4000/api/usuarios/actualizar`, {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: miEmail,
+          nombre: formPerfil.nombre,
+          cargo: formPerfil.cargo,
+          foto: formPerfil.foto // Envía la cadena Base64 (o URL) directamente
+        })
       });
 
       const data = await response.json().catch(() => ({}));
@@ -147,7 +138,6 @@ export default function Dashboard() {
         throw new Error(data.error || data.mensaje || `Error del servidor: ${response.status}`);
       }
 
-      // La URL de la foto que devuelve el servidor (o mantenemos la actual del form)
       const fotoFinal = data.foto || formPerfil.foto;
 
       // Actualizar localStorage
@@ -161,7 +151,6 @@ export default function Dashboard() {
       setMiFoto(obtenerFotoUrl(fotoFinal));
 
       setIsProfileOpen(false);
-      setArchivoFoto(null);
       
       // Recarga rápida para refrescar toda la interfaz visualmente
       window.location.reload();
@@ -246,7 +235,6 @@ export default function Dashboard() {
           <div 
             onClick={() => {
               setFormPerfil({ nombre: miNombre, cargo: miCargo, foto: localStorage.getItem('usuarioFoto') || '' });
-              setArchivoFoto(null);
               setIsProfileOpen(true);
             }} 
             className="relative group cursor-pointer flex-shrink-0"
@@ -290,7 +278,6 @@ export default function Dashboard() {
           <button 
             onClick={() => {
               setFormPerfil({ nombre: miNombre, cargo: miCargo, foto: localStorage.getItem('usuarioFoto') || '' });
-              setArchivoFoto(null);
               setIsProfileOpen(true);
             }}
             className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-2xl text-xs font-bold text-slate-200 transition-all flex items-center gap-2 shadow-lg"
@@ -593,7 +580,6 @@ export default function Dashboard() {
                   type="url"
                   value={formPerfil.foto.startsWith('data:') || formPerfil.foto.startsWith('http://localhost') ? '' : formPerfil.foto}
                   onChange={(e) => {
-                    setArchivoFoto(null); // Limpiamos archivo si escribe URL manual
                     setFormPerfil({ ...formPerfil, foto: e.target.value });
                   }}
                   className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-cyan-500 transition-colors text-sm"

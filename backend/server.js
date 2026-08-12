@@ -109,8 +109,28 @@ const actualizarUsuarioHandler = async (req, res) => {
         const { nombre, cargo } = req.body;
         let fotoFinal = req.body.foto;
 
+        // Si se subió un archivo tradicional por multipart/form-data
         if (req.file) {
             fotoFinal = `http://localhost:${PORT}/uploads/${req.file.filename}`;
+        } 
+        // Si se envió una cadena Base64 (ej. data:image/png;base64,...) en el JSON body
+        else if (fotoFinal && typeof fotoFinal === 'string' && fotoFinal.startsWith('data:image/')) {
+            try {
+                const matches = fotoFinal.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/);
+                if (matches && matches.length === 3) {
+                    let ext = matches[1].toLowerCase();
+                    if (ext === 'jpeg') ext = 'jpg';
+                    const base64Data = matches[2];
+                    const buffer = Buffer.from(base64Data, 'base64');
+                    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+                    const filename = `${uniqueSuffix}.${ext}`;
+                    const filepath = path.join(uploadDir, filename);
+                    fs.writeFileSync(filepath, buffer);
+                    fotoFinal = `http://localhost:${PORT}/uploads/${filename}`;
+                }
+            } catch (err) {
+                console.error("Error al procesar la imagen en Base64:", err);
+            }
         }
 
         const usuariosRef = db.collection('usuarios');
@@ -297,7 +317,6 @@ app.post('/api/actas', async (req, res) => {
             return res.status(400).json({ error: 'Debe incluir al menos un equipo en el acta.' });
         }
 
-        // 1. Ejecutar la generación del PDF con Puppeteer primero para obtener el nombre del archivo
         const pdfResult = await generarActaPDF(datosActa);
         let nombreArchivo = null;
         if (typeof pdfResult === 'string') {
@@ -324,14 +343,12 @@ app.post('/api/actas', async (req, res) => {
             equipos: datosActa.equipos,
             nombreResponsable: responsableFinal,
             identificacionResponsable: datosActa.identificacionResponsable || 'N/A',
-            nombreArchivo: nombreArchivo, // Guardamos la referencia para el historial/visualización
+            nombreArchivo: nombreArchivo,
             fechaCreacion: new Date().toISOString()
         };
 
-        // 2. Guardar registro general en la colección 'actas' de Firestore con el nombreArchivo incluido
         const docRef = await db.collection('actas').add(nuevaActa);
 
-        // 3. ACTUALIZAR CADA EQUIPO INVOLUCRADO EN FIRESTORE (Vincular acta y estado)
         const tipoActaLower = (datosActa.tipoActa || 'Asignación').toLowerCase();
         const esDevolucion = tipoActaLower.includes('devolución') || tipoActaLower.includes('devolucion');
 
@@ -365,11 +382,9 @@ app.post('/api/actas', async (req, res) => {
             }
         }
 
-        // 4. Construir la URL pública
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const pdfUrl = `${baseUrl}/uploads/${nombreArchivo}`;
 
-        // 5. Responder al cliente
         res.status(201).json({ 
             message: 'Acta generada, PDF creado y equipos actualizados con éxito', 
             id: docRef.id, 

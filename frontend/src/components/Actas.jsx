@@ -22,6 +22,9 @@ export default function Actas() {
   const [uidResponsable, setUidResponsable] = useState('');
   const [identificacionResponsable, setIdentificacionResponsable] = useState('');
 
+  // Estado para controlar la carga y evitar envíos múltiples
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -80,6 +83,10 @@ export default function Actas() {
 
   const handleSubmitActa = async (e) => {
     e.preventDefault();
+    
+    // Si ya está procesando una solicitud, ignorar clics adicionales
+    if (loading) return;
+
     setError('');
     setMensaje('');
 
@@ -87,6 +94,8 @@ export default function Actas() {
       setError('Debe agregar al menos un elemento al acta.');
       return;
     }
+
+    setLoading(true);
 
     const payloadActa = {
       tipoActa,
@@ -148,6 +157,9 @@ export default function Actas() {
 
     } catch (err) {
       setError(err.message);
+    } finally {
+      // Liberar el botón sin importar si hubo éxito o error
+      setLoading(false);
     }
   };
 
@@ -458,9 +470,24 @@ export default function Actas() {
           <div className="pt-6 border-t border-slate-700 flex justify-end">
             <button
               type="submit"
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-base shadow-lg transition-colors flex items-center gap-2"
+              disabled={loading}
+              className={`px-6 py-3 font-bold rounded-xl text-base shadow-lg transition-colors flex items-center gap-2 ${
+                loading 
+                  ? 'bg-slate-600 text-slate-300 cursor-not-allowed' 
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+              }`}
             >
-              Generar Acta y Descargar PDF
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Generando...
+                </>
+              ) : (
+                `Generar Acta de ${tipoActa}`
+              )}
             </button>
           </div>
 

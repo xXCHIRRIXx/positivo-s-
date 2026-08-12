@@ -11,6 +11,9 @@ export default function Equipos() {
   const [filtroTipo, setFiltroTipo] = useState('Todos');
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
+  
+  // Nuevo estado para controlar la carga y evitar múltiples clics
+  const [cargando, setCargando] = useState(false);
 
   const [esAdmin, setEsAdmin] = useState(true); 
   const [equipoEditando, setEquipoEditando] = useState(null);
@@ -98,8 +101,11 @@ export default function Equipos() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (cargando) return; // Evita ejecución si ya está enviando
+
     setError('');
     setMensaje('');
+    setCargando(true); // Bloquea el botón
 
     try {
       let url = 'http://localhost:4000/api/equipos';
@@ -143,6 +149,8 @@ export default function Equipos() {
       cargarEquipos();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setCargando(false); // Libera el botón al terminar (éxito o error)
     }
   };
 
@@ -458,13 +466,20 @@ export default function Equipos() {
 
               <button
                 type="submit"
+                disabled={cargando}
                 className={`w-full py-3 text-white font-bold rounded-lg shadow-lg transition-all text-sm ${
-                  equipoEditando 
-                    ? 'bg-amber-600 hover:bg-amber-500' 
-                    : 'bg-cyan-600 hover:bg-cyan-500'
+                  cargando
+                    ? 'bg-slate-600 opacity-50 cursor-not-allowed'
+                    : equipoEditando 
+                      ? 'bg-amber-600 hover:bg-amber-500' 
+                      : 'bg-cyan-600 hover:bg-cyan-500'
                 }`}
               >
-                {equipoEditando ? 'Actualizar Activo' : 'Guardar Activo'}
+                {cargando 
+                  ? 'Procesando...' 
+                  : equipoEditando 
+                    ? 'Actualizar Activo' 
+                    : 'Guardar Activo'}
               </button>
             </form>
           </div>

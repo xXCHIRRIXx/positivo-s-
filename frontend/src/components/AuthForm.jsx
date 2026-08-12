@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
+  
+  // Estado para controlar si el registro está desbloqueado
+  const [showRegisterOption, setShowRegisterOption] = useState(false);
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -14,6 +18,24 @@ export default function AuthForm() {
   const [mensaje, setMensaje] = useState('');
 
   const navigate = useNavigate();
+
+  // Escuchador de combinación secreta segura (Alt + Shift + R) para evitar conflictos con el navegador
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.altKey && e.shiftKey && e.key.toUpperCase() === 'R') {
+        e.preventDefault();
+        setShowRegisterOption((prev) => {
+          const newState = !prev;
+          setMensaje(newState ? '🔓 Modo de registro desbloqueado temporalmente.' : '🔒 Modo de registro oculto.');
+          setTimeout(() => setMensaje(''), 3000);
+          return newState;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -89,26 +111,34 @@ export default function AuthForm() {
 
         {/* Selector Login / Registro */}
         <div className="p-8">
-          <div className="flex justify-center mb-6 bg-slate-900 p-1 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setIsLogin(true)}
-              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                isLogin ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Iniciar Sesión
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsLogin(false)}
-              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                !isLogin ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Registrarse
-            </button>
-          </div>
+          {showRegisterOption ? (
+            <div className="flex justify-center mb-6 bg-slate-900 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setIsLogin(true)}
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                  isLogin ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Iniciar Sesión
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsLogin(false)}
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                  !isLogin ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Registrarse
+              </button>
+            </div>
+          ) : (
+            <div className="mb-6 text-center">
+              <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
+                Acceso exclusivo para personal autorizado
+              </span>
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 p-3 bg-red-500/20 border border-red-500 text-red-300 rounded-lg text-sm text-center">
@@ -123,7 +153,7 @@ export default function AuthForm() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
+            {!isLogin && showRegisterOption && (
               <>
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
@@ -188,7 +218,7 @@ export default function AuthForm() {
               />
             </div>
 
-            {!isLogin && (
+            {!isLogin && showRegisterOption && (
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
                   Confirmar Contraseña
