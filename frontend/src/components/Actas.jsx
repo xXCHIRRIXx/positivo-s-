@@ -44,7 +44,7 @@ export default function Actas() {
 
   const [equiposSeleccionados, setEquiposSeleccionados] = useState([]);
 
-  const [tipoElemento, setTipoElemento] = useState('Computador');
+  const [tipoElemento, setTipoElemento] = useState('Laptop Positivos');
   const [modeloItem, setModeloItem] = useState('');
   const [serialItem, setSerialItem] = useState('');
   const [estadoFisicoItem, setEstadoFisicoItem] = useState('Bueno');
@@ -373,11 +373,22 @@ export default function Actas() {
                   onChange={(e) => setTipoElemento(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500"
                 >
-                  <option value="Computador">Computador</option>
+                  <option value="Laptop Positivos">Laptop Positivos</option>
                   <option value="Celular">Celular</option>
                   <option value="Herramienta">Herramienta</option>
-                  <option value="Periférico">Periférico</option>
+                  <option value="Línea Telefónica">Línea Telefónica</option>
                   <option value="Almacenamiento">Almacenamiento</option>
+                  <option value="Diademas">Diademas</option>
+                  <option value="Teclado">Teclado</option>
+                  <option value="Mouse">Mouse</option>
+                  <option value="Base Refrigerante">Base Refrigerante</option>
+                  <option value="Pantalla">Pantalla</option>
+                  <option value="Multipuerto">Multipuerto</option>
+                  <option value="Cable HDMI">Cable HDMI</option>
+                  <option value="Cable UTP">Cable UTP</option>
+                  <option value="Cargador">Cargador</option>
+                  <option value="Guaya">Guaya</option>
+                  <option value="Maleta">Maleta</option>
                   <option value="Otro">Otro</option>
                 </select>
               </div>
