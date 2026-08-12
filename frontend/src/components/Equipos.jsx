@@ -12,14 +12,20 @@ export default function Equipos() {
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
   
-  // Nuevo estado para controlar la carga y evitar múltiples clics
   const [cargando, setCargando] = useState(false);
-
   const [esAdmin, setEsAdmin] = useState(true); 
   const [equipoEditando, setEquipoEditando] = useState(null);
 
   const [emailUsuario, setEmailUsuario] = useState('');
   const [uidUsuario, setUidUsuario] = useState('');
+
+  // Lista oficial de responsables con sus respectivas cédulas
+  const RESPONSABLES_DATA = [
+    { nombre: 'JUAN DAVID CASTRO', cedula: '1000127585' },
+    { nombre: 'ANDRÉS FELIPE CASTRO QUINTERO', cedula: '1013588412' },
+    { nombre: 'ESLEIDLER ANDREY CORREA RAMOS', cedula: '1028864085' },
+    { nombre: 'KEVIN MARINO OROBIO ANGULO', cedula: '1032677761' }
+  ];
 
   const [formData, setFormData] = useState({
     serial: '',
@@ -32,7 +38,8 @@ export default function Equipos() {
     ciudad: 'Bogotá',
     asignadoA: '',
     identificacionUsuario: '',
-    usuarioRegistro: ''
+    usuarioRegistro: '',
+    identificacionResponsable: ''
   });
 
   useEffect(() => {
@@ -57,11 +64,25 @@ export default function Equipos() {
   };
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+
+    if (name === 'usuarioRegistro') {
+      const responsableEncontrado = RESPONSABLES_DATA.find(r => r.nombre === value);
+      setFormData(prev => ({
+        ...prev,
+        usuarioRegistro: value,
+        identificacionResponsable: responsableEncontrado ? responsableEncontrado.cedula : ''
+      }));
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
   };
 
   const iniciarEdicion = (eq) => {
     setEquipoEditando(eq.id);
+    const responsableActual = eq.usuarioRegistro || eq.registradoPor || '';
+    const responsableEncontrado = RESPONSABLES_DATA.find(r => r.nombre === responsableActual);
+
     setFormData({
       serial: eq.serial || '',
       tipoPropiedad: eq.tipoPropiedad || 'Propio',
@@ -73,7 +94,8 @@ export default function Equipos() {
       ciudad: eq.ciudad || 'Bogotá',
       asignadoA: eq.asignadoA || eq.asignado_a || '',
       identificacionUsuario: eq.identificacionUsuario || eq.identificacion_usuario || '',
-      usuarioRegistro: eq.usuarioRegistro || eq.registradoPor || ''
+      usuarioRegistro: responsableActual,
+      identificacionResponsable: eq.identificacionResponsable || eq.identificacion_responsable || (responsableEncontrado ? responsableEncontrado.cedula : '')
     });
     setError('');
     setMensaje('');
@@ -93,7 +115,8 @@ export default function Equipos() {
       ciudad: 'Bogotá',
       asignadoA: '',
       identificacionUsuario: '',
-      usuarioRegistro: ''
+      usuarioRegistro: '',
+      identificacionResponsable: ''
     });
     setError('');
     setMensaje('');
@@ -101,11 +124,40 @@ export default function Equipos() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (cargando) return; // Evita ejecución si ya está enviando
+    if (cargando) return;
 
     setError('');
     setMensaje('');
-    setCargando(true); // Bloquea el botón
+
+    // Validaciones estrictas para evitar campos vacíos o con puros espacios en blanco
+    if (!formData.usuarioRegistro || formData.usuarioRegistro.trim() === '') {
+      setError('Debe seleccionar un responsable válido.');
+      return;
+    }
+    if (!formData.serial || formData.serial.trim() === '') {
+      setError('El número de serial no puede estar vacío o contener solo espacios.');
+      return;
+    }
+    if (!formData.modelo || formData.modelo.trim() === '') {
+      setError('El modelo / equipo no puede estar vacío o contener solo espacios.');
+      return;
+    }
+    if (formData.tipoPropiedad === 'Proveedor' && (!formData.proveedor || formData.proveedor.trim() === '')) {
+      setError('El nombre del proveedor no puede estar vacío o contener solo espacios.');
+      return;
+    }
+    if (formData.disponibilidad === 'Asignado') {
+      if (!formData.asignadoA || formData.asignadoA.trim() === '') {
+        setError('El nombre de a quién se asignó no puede estar vacío o contener solo espacios.');
+        return;
+      }
+      if (!formData.identificacionUsuario || formData.identificacionUsuario.trim() === '') {
+        setError('La identificación del usuario asignado no puede estar vacía o contener solo espacios.');
+        return;
+      }
+    }
+
+    setCargando(true);
 
     try {
       let url = 'http://localhost:4000/api/equipos';
@@ -116,16 +168,20 @@ export default function Equipos() {
         method = 'PUT';
       }
 
-      const asignadoVal = formData.disponibilidad === 'Asignado' ? formData.asignadoA : '';
-      const idVal = formData.disponibilidad === 'Asignado' ? formData.identificacionUsuario : '';
+      const asignadoVal = formData.disponibilidad === 'Asignado' ? formData.asignadoA.trim() : '';
+      const idVal = formData.disponibilidad === 'Asignado' ? formData.identificacionUsuario.trim() : '';
       const fechaActual = new Date().toISOString();
 
       const datosAEnviar = {
         ...formData,
+        serial: formData.serial.trim(),
+        modelo: formData.modelo.trim(),
+        proveedor: formData.tipoPropiedad === 'Proveedor' ? formData.proveedor.trim() : '',
         asignadoA: asignadoVal,
         identificacionUsuario: idVal,
         asignado_a: asignadoVal,
         identificacion_usuario: idVal,
+        descripcion: formData.descripcion ? formData.descripcion.trim() : '',
         registradoPor: formData.usuarioRegistro,
         emailUsuario: emailUsuario,
         uidUsuario: uidUsuario,
@@ -150,7 +206,7 @@ export default function Equipos() {
     } catch (err) {
       setError(err.message);
     } finally {
-      setCargando(false); // Libera el botón al terminar (éxito o error)
+      setCargando(false);
     }
   };
 
@@ -178,13 +234,18 @@ export default function Equipos() {
     const asignadoTexto = eq.asignadoA || eq.asignado_a || '';
     const idTexto = eq.identificacionUsuario || eq.identificacion_usuario || '';
     const responsableTexto = eq.usuarioRegistro || eq.registradoPor || '';
+    const respEncontrado = RESPONSABLES_DATA.find(r => r.nombre === responsableTexto);
+    const cedulaRespTexto = eq.identificacionResponsable || eq.identificacion_responsable || (respEncontrado ? respEncontrado.cedula : '');
+    const proveedorTexto = eq.proveedor || '';
 
     const cumpleBusqueda = 
       (eq.serial && eq.serial.toLowerCase().includes(busqueda.toLowerCase())) ||
       (eq.modelo && eq.modelo.toLowerCase().includes(busqueda.toLowerCase())) ||
       (asignadoTexto.toLowerCase().includes(busqueda.toLowerCase())) ||
       (idTexto.toLowerCase().includes(busqueda.toLowerCase())) ||
-      (responsableTexto.toLowerCase().includes(busqueda.toLowerCase()));
+      (responsableTexto.toLowerCase().includes(busqueda.toLowerCase())) ||
+      (cedulaRespTexto.toLowerCase().includes(busqueda.toLowerCase())) ||
+      (proveedorTexto.toLowerCase().includes(busqueda.toLowerCase()));
 
     if (filtroTipo === 'Todos') return cumpleBusqueda;
     if (filtroTipo === 'Propios') return cumpleBusqueda && eq.tipoPropiedad === 'Propio';
@@ -198,21 +259,28 @@ export default function Equipos() {
       return;
     }
 
-    const datosExcel = equiposFiltrados.map(eq => ({
-      'Serial': eq.serial || 'N/A',
-      'Modelo / Equipo': eq.modelo || 'N/A',
-      'Tipo Propiedad': eq.tipoPropiedad || 'Propio',
-      'Proveedor': eq.proveedor || 'N/A',
-      'Ciudad': eq.ciudad || 'Bogotá',
-      'Estado Físico': eq.estadoFisico || 'Bueno',
-      'Disponibilidad': eq.disponibilidad || 'Disponible',
-      'Asignado A': eq.asignadoA || eq.asignado_a || 'N/A',
-      'Identificación': eq.identificacionUsuario || eq.identificacion_usuario || 'N/A',
-      'Responsable': eq.usuarioRegistro || eq.registradoPor || 'N/A',
-      'Fecha Registro': eq.fechaRegistro ? new Date(eq.fechaRegistro).toLocaleString() : 'N/A',
-      'Última Actualización': eq.fechaActualizacion ? new Date(eq.fechaActualizacion).toLocaleString() : 'N/A',
-      'Descripción / Observaciones': eq.descripcion || ''
-    }));
+    const datosExcel = equiposFiltrados.map(eq => {
+      const responsable = eq.usuarioRegistro || eq.registradoPor || 'N/A';
+      const respEncontrado = RESPONSABLES_DATA.find(r => r.nombre === responsable);
+      const cedulaResp = eq.identificacionResponsable || eq.identificacion_responsable || (respEncontrado ? respEncontrado.cedula : 'N/A');
+
+      return {
+        'Serial': eq.serial || 'N/A',
+        'Modelo / Equipo': eq.modelo || 'N/A',
+        'Tipo Propiedad': eq.tipoPropiedad || 'Propio',
+        'Proveedor': eq.proveedor || 'N/A',
+        'Ciudad': eq.ciudad || 'Bogotá',
+        'Estado Físico': eq.estadoFisico || 'Bueno',
+        'Disponibilidad': eq.disponibilidad || 'Disponible',
+        'Asignado A': eq.asignadoA || eq.asignado_a || 'N/A',
+        'Identificación Asignado': eq.identificacionUsuario || eq.identificacion_usuario || 'N/A',
+        'Responsable': responsable,
+        'Cédula Responsable': cedulaResp,
+        'Fecha Registro': eq.fechaRegistro ? new Date(eq.fechaRegistro).toLocaleString() : 'N/A',
+        'Última Actualización': eq.fechaActualizacion ? new Date(eq.fechaActualizacion).toLocaleString() : 'N/A',
+        'Descripción / Observaciones': eq.descripcion || ''
+      };
+    });
 
     const hoja = XLSX.utils.json_to_sheet(datosExcel);
     const libro = XLSX.utils.book_new();
@@ -313,20 +381,37 @@ export default function Equipos() {
             {mensaje && <div className="mb-4 p-3 bg-emerald-500/20 border border-emerald-500 text-emerald-300 rounded-lg text-xs">{mensaje}</div>}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-cyan-300 uppercase mb-1">Responsable</label>
-                <select
-                  name="usuarioRegistro"
-                  required
-                  value={formData.usuarioRegistro}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 bg-slate-900 border border-cyan-500/50 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-400"
-                >
-                  <option value="" disabled>-- Seleccione un responsable --</option>
-                  <option value="JUAN CASTRO">JUAN DAVID CASTRO</option>
-                  <option value="ANDRES CASTRO">ANDRES FELIPE CASTRO</option>
-                  <option value="ESTEFANIA ROCHA">ESTEFANIA GALARZA ROCHA</option>
-                </select>
+              <div className="space-y-3 p-3.5 bg-slate-900/60 border border-cyan-500/40 rounded-xl">
+                <div>
+                  <label className="block text-xs font-semibold text-cyan-300 uppercase mb-1">Responsable</label>
+                  <select
+                    name="usuarioRegistro"
+                    required
+                    value={formData.usuarioRegistro}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 bg-slate-900 border border-cyan-500/50 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-400"
+                  >
+                    <option value="" disabled>-- Seleccione un responsable --</option>
+                    {RESPONSABLES_DATA.map((resp, index) => (
+                      <option key={index} value={resp.nombre}>
+                        {resp.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-cyan-300 uppercase mb-1">Cédula del Responsable</label>
+                  <input
+                    type="text"
+                    name="identificacionResponsable"
+                    required
+                    readOnly
+                    value={formData.identificacionResponsable}
+                    placeholder="Se completa automáticamente"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-cyan-200 text-sm focus:outline-none cursor-not-allowed"
+                  />
+                </div>
               </div>
 
               <div>
@@ -518,11 +603,11 @@ export default function Equipos() {
                     <th className="py-3 px-3">Serial</th>
                     <th className="py-3 px-3">Modelo</th>
                     <th className="py-3 px-3">Fechas</th>
-                    <th className="py-3 px-3">Propiedad</th>
+                    <th className="py-3 px-3 min-w-[160px]">Propiedad</th>
                     <th className="py-3 px-3">Ciudad</th>
                     <th className="py-3 px-3">Estado</th>
                     <th className="py-3 px-3">Disponibilidad / Asignado</th>
-                    <th className="py-3 px-3">Responsable</th>
+                    <th className="py-3 px-3 min-w-[180px]">Responsable</th>
                     <th className="py-3 px-3">Descripción</th>
                     <th className="py-3 px-3 text-center">Acciones</th>
                   </tr>
@@ -537,6 +622,9 @@ export default function Equipos() {
                       const nombreAsignado = eq.asignadoA || eq.asignado_a;
                       const idAsignado = eq.identificacionUsuario || eq.identificacion_usuario;
                       const responsable = eq.usuarioRegistro || eq.registradoPor || 'N/A';
+                      
+                      const respEncontrado = RESPONSABLES_DATA.find(r => r.nombre === responsable);
+                      const cedulaResponsable = eq.identificacionResponsable || eq.identificacion_responsable || (respEncontrado ? respEncontrado.cedula : '') || 'N/A';
 
                       return (
                         <tr key={eq.id} className="hover:bg-slate-700/30 transition-colors">
@@ -558,14 +646,19 @@ export default function Equipos() {
                               )}
                             </div>
                           </td>
-                          <td className="py-3 px-3">
-                            <span className={`px-2 py-0.5 rounded-full font-semibold border ${
+                          <td className="py-3 px-3 min-w-[160px]">
+                            <span className={`px-2 py-0.5 rounded-full font-semibold border inline-block ${
                               eq.tipoPropiedad === 'Propio' 
                                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
                                 : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                             }`}>
-                              {eq.tipoPropiedad} {eq.tipoPropiedad === 'Proveedor' && eq.proveedor ? `(${eq.proveedor})` : ''}
+                              {eq.tipoPropiedad}
                             </span>
+                            {eq.tipoPropiedad === 'Proveedor' && eq.proveedor && (
+                              <div className="text-[11px] text-amber-200/90 font-medium mt-1.5 break-words leading-tight">
+                                🏢 {eq.proveedor}
+                              </div>
+                            )}
                           </td>
                           <td className="py-3 px-3">
                             <span className="px-2 py-0.5 bg-slate-700/50 text-slate-200 border border-slate-600 rounded font-medium">
@@ -592,8 +685,9 @@ export default function Equipos() {
                               </div>
                             )}
                           </td>
-                          <td className="py-3 px-3 text-cyan-300 font-medium">
-                            {responsable}
+                          <td className="py-3 px-3 min-w-[180px]">
+                            <div className="text-cyan-300 font-semibold break-words leading-tight">{responsable}</div>
+                            <div className="text-[11px] font-mono text-slate-400 mt-0.5">ID: {cedulaResponsable}</div>
                           </td>
                           <td className="py-3 px-3 text-slate-300 max-w-xs truncate" title={eq.descripcion}>
                             {eq.descripcion || <span className="text-slate-500 italic">Sin descripción</span>}

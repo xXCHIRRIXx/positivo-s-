@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { auth } from '../auth/firebase.config';
 import { onAuthStateChanged } from 'firebase/auth';
 
+const PERSONAL_AUTORIZADO = [
+  { nombre: 'JUAN DAVID CASTRO', cedula: '1000127585' },
+  { nombre: 'ANDRÉS FELIPE CASTRO QUINTERO', cedula: '1013588412' },
+  { nombre: 'ESLEIDLER ANDREY CORREA RAMOS', cedula: '1028864085' },
+  { nombre: 'KEVIN MARINO OROBIO ANGULO', cedula: '1032677761' }
+];
+
 export default function Actas() {
   const navigate = useNavigate();
   
@@ -49,6 +56,18 @@ export default function Actas() {
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
 
+  // Autocompletar Responsable y su cédula (Datos del responsable)
+  const handleResponsableChange = (e) => {
+    const nombreSeleccionado = e.target.value;
+    setNombreResponsable(nombreSeleccionado);
+    const encontrado = PERSONAL_AUTORIZADO.find(c => c.nombre === nombreSeleccionado);
+    if (encontrado) {
+      setIdentificacionResponsable(encontrado.cedula);
+    } else {
+      setIdentificacionResponsable('');
+    }
+  };
+
   const agregarEquipoALista = (e) => {
     e.preventDefault();
     if (!modeloItem.trim() || !serialItem.trim()) {
@@ -56,7 +75,7 @@ export default function Actas() {
       return;
     }
 
-    if (equiposSeleccionados.some(item => item.serial.toLowerCase() === serialItem.trim().toLowerCase())) {
+    if (equiposSeleccionados.some(item => item.serial.trim().toLowerCase() === serialItem.trim().toLowerCase())) {
       alert('Este serial ya está agregado en la lista del acta.');
       return;
     }
@@ -84,11 +103,25 @@ export default function Actas() {
   const handleSubmitActa = async (e) => {
     e.preventDefault();
     
-    // Si ya está procesando una solicitud, ignorar clics adicionales
     if (loading) return;
 
     setError('');
     setMensaje('');
+
+    // Validación estricta para evitar espacios en blanco o campos vacíos
+    if (
+      !nombreResponsable.trim() || 
+      !identificacionResponsable.trim() ||
+      !nombresColaborador.trim() || 
+      !identificacion.trim() || 
+      !correoCorporativo.trim() || 
+      !cargo.trim() || 
+      !centroResultados.trim() || 
+      !liderInmediato.trim()
+    ) {
+      setError('Todos los campos son obligatorios y no pueden contener únicamente espacios en blanco.');
+      return;
+    }
 
     if (equiposSeleccionados.length === 0) {
       setError('Debe agregar al menos un elemento al acta.');
@@ -99,25 +132,24 @@ export default function Actas() {
 
     const payloadActa = {
       tipoActa,
-      nombresColaborador,
-      identificacion,
-      correoCorporativo,
-      cargo,
-      centroResultados,
-      liderInmediato,
+      nombresColaborador: nombresColaborador.trim(),
+      identificacion: identificacion.trim(),
+      correoCorporativo: correoCorporativo.trim(),
+      cargo: cargo.trim(),
+      centroResultados: centroResultados.trim(),
+      liderInmediato: liderInmediato.trim(),
       fechaAsignacion,
       equipos: equiposSeleccionados,
       novedades: novedades.trim() || 'Ninguna',
-      nombreResponsable,
+      nombreResponsable: nombreResponsable.trim(),
       emailResponsable,
       uidResponsable,
-      identificacionResponsable,
+      identificacionResponsable: identificacionResponsable.trim(),
       
-      // --- CAMPOS DE AUDITORÍA Y TRAZABILIDAD ---
-      usuarioRegistro: nombreResponsable,
+      usuarioRegistro: nombreResponsable.trim(),
       emailUsuario: emailResponsable,
       uidUsuario: uidResponsable,
-      auditoria_responsable: nombreResponsable,
+      auditoria_responsable: nombreResponsable.trim(),
       auditoria_sede: sede,
       auditoria_accion: `Generación Acta ${tipoActa}`
     };
@@ -143,7 +175,6 @@ export default function Actas() {
 
       setMensaje(`¡Acta de ${tipoActa} generada y PDF descargado con éxito!`);
       
-      // Limpieza completa de formularios al éxito
       setNombreResponsable('');
       setIdentificacionResponsable('');
       setNombresColaborador('');
@@ -158,7 +189,6 @@ export default function Actas() {
     } catch (err) {
       setError(err.message);
     } finally {
-      // Liberar el botón sin importar si hubo éxito o error
       setLoading(false);
     }
   };
@@ -235,13 +265,15 @@ export default function Actas() {
                 <select
                   required
                   value={nombreResponsable}
-                  onChange={(e) => setNombreResponsable(e.target.value)}
+                  onChange={handleResponsableChange}
                   className="w-full px-3 py-2 bg-slate-900 border border-cyan-500/50 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-400"
                 >
                   <option value="" disabled>-- Seleccione un responsable --</option>
-                  <option value="JUAN CASTRO">JUAN DAVID CASTRO</option>
-                  <option value="ANDRES CASTRO">ANDRES FELIPE CASTRO</option>
-                  <option value="ESTEFANIA ROCHA">ESTEFANIA GALARZA ROCHA</option>
+                  {PERSONAL_AUTORIZADO.map((item, idx) => (
+                    <option key={idx} value={item.nombre}>
+                      {item.nombre}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -249,10 +281,10 @@ export default function Actas() {
                 <input
                   type="text"
                   required
+                  readOnly
                   value={identificacionResponsable}
-                  onChange={(e) => setIdentificacionResponsable(e.target.value)}
-                  placeholder="Ej. 10203040"
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500"
+                  placeholder="Se autocompleta automáticamente"
+                  className="w-full px-3 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-sm text-cyan-300 focus:outline-none cursor-not-allowed"
                 />
               </div>
             </div>
@@ -279,7 +311,7 @@ export default function Actas() {
                   required
                   value={identificacion}
                   onChange={(e) => setIdentificacion(e.target.value)}
-                  placeholder="Ej. 10203040"
+                  placeholder="Ej. 1020304050"
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500"
                 />
               </div>
